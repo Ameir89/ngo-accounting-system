@@ -1,0 +1,1 @@
+# Fixed assets API

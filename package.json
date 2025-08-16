@@ -1,0 +1,23 @@
+
+{
+  "name": "ngo-accounting-system",
+  "version": "1.0.0",
+  "description": "NGO Accounting System - Complete Financial Management Solution",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install && cd frontend && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && python app.py",
+    "dev:frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "test": "cd backend && python -m pytest && cd ../frontend && npm test",
+    "lint": "cd backend && flake8 . && cd ../frontend && npm run lint",
+    "format": "cd backend && black . && cd ../frontend && npm run format"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+}
