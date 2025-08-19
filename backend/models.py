@@ -2,10 +2,9 @@
 
 # backend/models.py
 from flask_sqlalchemy import SQLAlchemy
-from flask_user import UserMixin
+from flask_login import UserMixin
 from datetime import datetime, date
-from decimal import Decimal
-from sqlalchemy import Column, Integer, String, DateTime, Date, Decimal as SQLDecimal, Boolean, Text, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Date,  Boolean, Text, ForeignKey, Enum, Numeric
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 import enum
@@ -122,7 +121,7 @@ class Project(db.Model):
     description = Column(Text)
     start_date = Column(Date)
     end_date = Column(Date)
-    budget_amount = Column(SQLDecimal(15, 2))
+    budget_amount = Column(Numeric(15, 2))
     is_active = Column(Boolean, default=True)
     cost_center_id = Column(Integer, ForeignKey('cost_centers.id'))
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -155,7 +154,7 @@ class ExchangeRate(db.Model):
     id = Column(Integer, primary_key=True)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=False)
     rate_date = Column(Date, nullable=False)
-    rate = Column(SQLDecimal(10, 6), nullable=False)
+    rate = Column(Numeric(10, 6), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -171,10 +170,10 @@ class JournalEntry(db.Model):
     description = Column(Text, nullable=False)
     entry_type = Column(Enum(JournalEntryType), default=JournalEntryType.MANUAL)
     reference_number = Column(String(50))
-    total_debit = Column(SQLDecimal(15, 2), default=0)
-    total_credit = Column(SQLDecimal(15, 2), default=0)
+    total_debit = Column(Numeric(15, 2), default=0)
+    total_credit = Column(Numeric(15, 2), default=0)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=False)
-    exchange_rate = Column(SQLDecimal(10, 6), default=1)
+    exchange_rate = Column(Numeric(10, 6), default=1)
     is_posted = Column(Boolean, default=False)
     created_by = Column(Integer, ForeignKey('users.id'), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -194,8 +193,8 @@ class JournalEntryLine(db.Model):
     cost_center_id = Column(Integer, ForeignKey('cost_centers.id'))
     project_id = Column(Integer, ForeignKey('projects.id'))
     description = Column(Text)
-    debit_amount = Column(SQLDecimal(15, 2), default=0)
-    credit_amount = Column(SQLDecimal(15, 2), default=0)
+    debit_amount = Column(Numeric(15, 2), default=0)
+    credit_amount = Column(Numeric(15, 2), default=0)
     line_number = Column(Integer, nullable=False)
     
     # Relationships
@@ -230,7 +229,7 @@ class Grant(db.Model):
     title_ar = Column(String(200))
     donor_id = Column(Integer, ForeignKey('donors.id'), nullable=False)
     project_id = Column(Integer, ForeignKey('projects.id'))
-    amount = Column(SQLDecimal(15, 2), nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=False)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
@@ -273,7 +272,7 @@ class PurchaseOrder(db.Model):
     supplier_id = Column(Integer, ForeignKey('suppliers.id'), nullable=False)
     order_date = Column(Date, nullable=False)
     delivery_date = Column(Date)
-    total_amount = Column(SQLDecimal(15, 2), default=0)
+    total_amount = Column(Numeric(15, 2), default=0)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=False)
     status = Column(String(20), default='pending')
     notes = Column(Text)
@@ -290,9 +289,9 @@ class PurchaseOrderLine(db.Model):
     id = Column(Integer, primary_key=True)
     purchase_order_id = Column(Integer, ForeignKey('purchase_orders.id'), nullable=False)
     description = Column(String(200), nullable=False)
-    quantity = Column(SQLDecimal(10, 2), nullable=False)
-    unit_price = Column(SQLDecimal(10, 2), nullable=False)
-    total_amount = Column(SQLDecimal(15, 2), nullable=False)
+    quantity = Column(Numeric(10, 2), nullable=False)
+    unit_price = Column(Numeric(10, 2), nullable=False)
+    total_amount = Column(Numeric(15, 2), nullable=False)
     line_number = Column(Integer, nullable=False)
     
     # Relationships
@@ -306,8 +305,8 @@ class SupplierInvoice(db.Model):
     supplier_id = Column(Integer, ForeignKey('suppliers.id'), nullable=False)
     invoice_date = Column(Date, nullable=False)
     due_date = Column(Date)
-    total_amount = Column(SQLDecimal(15, 2), nullable=False)
-    paid_amount = Column(SQLDecimal(15, 2), default=0)
+    total_amount = Column(Numeric(15, 2), nullable=False)
+    paid_amount = Column(Numeric(15, 2), default=0)
     currency_id = Column(Integer, ForeignKey('currencies.id'), nullable=False)
     status = Column(String(20), default='pending')
     notes = Column(Text)
@@ -325,7 +324,7 @@ class Payment(db.Model):
     payment_number = Column(String(20), unique=True, nullable=False)
     invoice_id = Column(Integer, ForeignKey('supplier_invoices.id'), nullable=False)
     payment_date = Column(Date, nullable=False)
-    amount = Column(SQLDecimal(15, 2), nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
     payment_method = Column(String(50))
     reference_number = Column(String(50))
     notes = Column(Text)
@@ -344,11 +343,11 @@ class FixedAsset(db.Model):
     name_ar = Column(String(100))
     description = Column(Text)
     purchase_date = Column(Date, nullable=False)
-    purchase_cost = Column(SQLDecimal(15, 2), nullable=False)
+    purchase_cost = Column(Numeric(15, 2), nullable=False)
     useful_life_years = Column(Integer, nullable=False)
     depreciation_method = Column(Enum(AssetDepreciationMethod), default=AssetDepreciationMethod.STRAIGHT_LINE)
-    salvage_value = Column(SQLDecimal(15, 2), default=0)
-    accumulated_depreciation = Column(SQLDecimal(15, 2), default=0)
+    salvage_value = Column(Numeric(15, 2), default=0)
+    accumulated_depreciation = Column(Numeric(15, 2), default=0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
@@ -369,7 +368,7 @@ class DepreciationEntry(db.Model):
     id = Column(Integer, primary_key=True)
     asset_id = Column(Integer, ForeignKey('fixed_assets.id'), nullable=False)
     entry_date = Column(Date, nullable=False)
-    depreciation_amount = Column(SQLDecimal(15, 2), nullable=False)
+    depreciation_amount = Column(Numeric(15, 2), nullable=False)
     journal_entry_id = Column(Integer, ForeignKey('journal_entries.id'))
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -390,7 +389,7 @@ class Budget(db.Model):
     project_id = Column(Integer, ForeignKey('projects.id'))
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
-    total_budget = Column(SQLDecimal(15, 2), default=0)
+    total_budget = Column(Numeric(15, 2), default=0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
@@ -405,7 +404,7 @@ class BudgetLine(db.Model):
     budget_id = Column(Integer, ForeignKey('budgets.id'), nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
     cost_center_id = Column(Integer, ForeignKey('cost_centers.id'))
-    budgeted_amount = Column(SQLDecimal(15, 2), nullable=False)
+    budgeted_amount = Column(Numeric(15, 2), nullable=False)
     period_month = Column(Integer)  # 1-12 for monthly budgets
     notes = Column(Text)
     

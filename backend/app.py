@@ -11,7 +11,7 @@ import json
 
 from config import config
 from models import db, User, Role
-from additional_api_endpoints import register_additional_blueprints
+# from additional_api_endpoints import register_additional_blueprints
 
 # Import API blueprints
 from api.auth import auth_bp
@@ -39,7 +39,7 @@ def create_app(config_name=None):
     app.register_blueprint(accounts_bp)
     app.register_blueprint(journals_bp)
     app.register_blueprint(reports_bp)
-    register_additional_blueprints(app)
+    # register_additional_blueprints(app)
     
     # Health check endpoint
     @app.route('/health')
