@@ -125,7 +125,7 @@
 
 /* Custom components */
 .sidebar-nav-item {
-  @apply group w-full flex items-center px-2 py-2 text-base font-medium rounded-md transition-colors duration-200;
+  @apply w-full flex items-center px-2 py-2 text-base font-medium rounded-md transition-colors duration-200;
 }
 
 .sidebar-nav-item-active {

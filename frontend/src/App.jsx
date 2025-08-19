@@ -1,8 +1,8 @@
 // frontend/src/App.jsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useEffect, useState } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import { ReactQueryDevtools } from 'react-query/devtools';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 
 // Context Providers
@@ -11,7 +11,7 @@ import { LanguageProvider } from './contexts/LanguageContext';
 
 // Layout Components
 import Layout from './components/Layout/Layout';
-import LoginPage from './pages/LoginPage';
+import LoginPage from './pages/Login';
 
 // Page Components
 import ChartOfAccounts from './pages/ChartOfAccounts';

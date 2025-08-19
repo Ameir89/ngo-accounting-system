@@ -1,7 +1,9 @@
 // frontend/src/pages/Grants.jsx
 import {
-    DollarSign, Edit, Eye, FileText,
-    Plus, ProgressBar, Search, Trash2, TrendingUp
+  BarChart3,
+  DollarSign, Edit, Eye, FileText,
+  Plus,
+  Search, Trash2, TrendingUp
 } from 'lucide-react';
 import { useState } from 'react';
 import Modal from '../components/UI/Modal';
@@ -179,7 +181,7 @@ const Grants = () => {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="bg-purple-500 rounded-md p-3">
-                  <ProgressBar className="h-6 w-6 text-white" />
+                  <BarChart3 className="h-6 w-6 text-white" />
                 </div>
               </div>
               <div className="ml-5 w-0 flex-1">

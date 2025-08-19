@@ -1,6 +1,6 @@
 // frontend/src/components/Forms/TouchFriendlyInput.jsx
-
 import { Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
 
 const TouchFriendlyInput = ({ 
   type = 'text', 
@@ -54,3 +54,5 @@ const TouchFriendlyInput = ({
     </div>
   );
 };
+
+export default TouchFriendlyInput;
