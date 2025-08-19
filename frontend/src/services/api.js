@@ -4,8 +4,9 @@ import toast from 'react-hot-toast';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1',
   timeout: 30000,
+  withCredentials: true, // Important for CORS with credentials
   headers: {
     'Content-Type': 'application/json',
   },
