@@ -1,152 +1,177 @@
-// frontend/src/hooks/useApi.js
+// 4. Advanced React Hook for API Integration
+// frontend/src/hooks/useAdvancedApi.js
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
-import { apiService } from '../services/api';
 
-// Generic hook for GET requests
-export const useApiQuery = (key, queryFn, options = {}) => {
-  return useQuery(key, queryFn, {
-    onError: (error) => {
-      if (options.showErrorToast !== false) {
-        toast.error(error.response?.data?.message || 'Failed to fetch data');
-      }
-    },
-    ...options,
-  });
-};
-
-// Generic hook for mutations (POST, PUT, DELETE)
-export const useApiMutation = (mutationFn, options = {}) => {
+export const useAdvancedApi = () => {
   const queryClient = useQueryClient();
-  
-  return useMutation(mutationFn, {
-    onSuccess: (data, variables, context) => {
-      if (options.successMessage) {
-        toast.success(options.successMessage);
+  const abortControllerRef = useRef();
+
+  // Cleanup function to abort requests
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-      
-      if (options.invalidateQueries) {
-        options.invalidateQueries.forEach((queryKey) => {
-          queryClient.invalidateQueries(queryKey);
-        });
+    };
+  }, []);
+
+  // Generic query hook with advanced features
+  const useAdvancedQuery = (key, queryFn, options = {}) => {
+    return useQuery(key, queryFn, {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      retry: (failureCount, error) => {
+        // Don't retry on 4xx errors
+        if (error.response?.status >= 400 && error.response?.status < 500) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      onError: (error) => {
+        if (options.showErrorToast !== false) {
+          toast.error(error.message || 'Failed to fetch data');
+        }
+      },
+      ...options
+    });
+  };
+
+  // Optimistic updates mutation
+  const useOptimisticMutation = (mutationFn, options = {}) => {
+    return useMutation(mutationFn, {
+      onMutate: async (variables) => {
+        // Cancel outgoing refetches
+        if (options.queryKey) {
+          await queryClient.cancelQueries(options.queryKey);
+          
+          // Snapshot previous value
+          const previousData = queryClient.getQueryData(options.queryKey);
+          
+          // Optimistically update
+          if (options.optimisticUpdate) {
+            queryClient.setQueryData(options.queryKey, old => 
+              options.optimisticUpdate(old, variables)
+            );
+          }
+          
+          return { previousData };
+        }
+      },
+      onError: (error, variables, context) => {
+        // Rollback on error
+        if (context?.previousData && options.queryKey) {
+          queryClient.setQueryData(options.queryKey, context.previousData);
+        }
+        
+        toast.error(error.message || 'Operation failed');
+        
+        if (options.onError) {
+          options.onError(error, variables, context);
+        }
+      },
+      onSuccess: (data, variables, context) => {
+        if (options.successMessage) {
+          toast.success(options.successMessage);
+        }
+        
+        if (options.onSuccess) {
+          options.onSuccess(data, variables, context);
+        }
+      },
+      onSettled: () => {
+        // Refetch to ensure consistency
+        if (options.queryKey) {
+          queryClient.invalidateQueries(options.queryKey);
+        }
       }
-      
-      if (options.onSuccess) {
-        options.onSuccess(data, variables, context);
+    });
+  };
+
+  // Batch operations hook
+  const useBatchOperations = () => {
+    const [operations, setOperations] = useState([]);
+    const [isExecuting, setIsExecuting] = useState(false);
+
+    const addOperation = useCallback((operation) => {
+      setOperations(prev => [...prev, operation]);
+    }, []);
+
+    const removeOperation = useCallback((index) => {
+      setOperations(prev => prev.filter((_, i) => i !== index));
+    }, []);
+
+    const executeBatch = useCallback(async () => {
+      if (operations.length === 0) return;
+
+      setIsExecuting(true);
+      const results = [];
+      const errors = [];
+
+      try {
+        for (const operation of operations) {
+          try {
+            const result = await operation.execute();
+            results.push({ success: true, data: result, operation });
+          } catch (error) {
+            errors.push({ success: false, error, operation });
+          }
+        }
+
+        if (errors.length === 0) {
+          toast.success(`Successfully executed ${operations.length} operations`);
+        } else {
+          toast.error(`${errors.length} operations failed`);
+        }
+
+        setOperations([]);
+        return { results, errors };
+      } finally {
+        setIsExecuting(false);
       }
-    },
-    onError: (error, variables, context) => {
-      if (options.showErrorToast !== false) {
-        toast.error(error.response?.data?.message || 'Operation failed');
+    }, [operations]);
+
+    return {
+      operations,
+      addOperation,
+      removeOperation,
+      executeBatch,
+      isExecuting,
+      canExecute: operations.length > 0 && !isExecuting
+    };
+  };
+
+  // Real-time data hook using polling
+  const useRealTimeData = (key, queryFn, interval = 30000) => {
+    const [isPolling, setIsPolling] = useState(false);
+
+    const query = useAdvancedQuery(
+      key,
+      queryFn,
+      {
+        refetchInterval: isPolling ? interval : false,
+        refetchIntervalInBackground: true
       }
-      
-      if (options.onError) {
-        options.onError(error, variables, context);
-      }
-    },
-    ...options,
-  });
-};
-
-// Specific API hooks
-export const useAccounts = (params = {}) => {
-  return useApiQuery(
-    ['accounts', params],
-    () => apiService.accounts.getAll(params).then(res => res.data),
-    { staleTime: 5 * 60 * 1000 }
-  );
-};
-
-export const useCreateAccount = () => {
-  return useApiMutation(
-    (data) => apiService.accounts.create(data),
-    {
-      successMessage: 'Account created successfully',
-      invalidateQueries: [['accounts']],
-    }
-  );
-};
-
-export const useJournalEntries = (params = {}) => {
-  return useApiQuery(
-    ['journalEntries', params],
-    () => apiService.journalEntries.getAll(params).then(res => res.data)
-  );
-};
-
-export const useCreateJournalEntry = () => {
-  return useApiMutation(
-    (data) => apiService.journalEntries.create(data),
-    {
-      successMessage: 'Journal entry created successfully',
-      invalidateQueries: [['journalEntries'], ['dashboard']],
-    }
-  );
-};
-
-export const usePostJournalEntry = () => {
-  return useApiMutation(
-    (id) => apiService.journalEntries.post(id),
-    {
-      successMessage: 'Journal entry posted successfully',
-      invalidateQueries: [['journalEntries'], ['dashboard']],
-    }
-  );
-};
-
-export const useDashboardData = () => {
-  return useApiQuery(
-    ['dashboard'],
-    () => apiService.dashboard.getSummary().then(res => res.data),
-    { staleTime: 2 * 60 * 1000 }
-  );
-};
-
-export const useSuppliers = (params = {}) => {
-  return useApiQuery(
-    ['suppliers', params],
-    () => apiService.suppliers.getAll(params).then(res => res.data)
-  );
-};
-
-export const useCreateSupplier = () => {
-  return useApiMutation(
-    (data) => apiService.suppliers.create(data),
-    {
-      successMessage: 'Supplier created successfully',
-      invalidateQueries: [['suppliers']],
-    }
-  );
-};
-
-export const useGrants = (params = {}) => {
-  return useApiQuery(
-    ['grants', params],
-    () => apiService.grants.getAll(params).then(res => res.data)
-  );
-};
-
-export const useFixedAssets = (params = {}) => {
-  return useApiQuery(
-    ['fixedAssets', params],
-    () => apiService.fixedAssets.getAll(params).then(res => res.data)
-  );
-};
-
-export const useReports = {
-  trialBalance: (params = {}) => {
-    return useApiQuery(
-      ['reports', 'trialBalance', params],
-      () => apiService.reports.trialBalance(params).then(res => res.data),
-      { enabled: false } // Only run when explicitly triggered
     );
-  },
-  
-  balanceSheet: (params = {}) => {
-    return useApiQuery(
-      ['reports', 'balanceSheet', params],
-      () => apiService.reports.balanceSheet(params).then(res => res.data),
-      { enabled: false }
-    );
-  },
+
+    const startPolling = useCallback(() => setIsPolling(true), []);
+    const stopPolling = useCallback(() => setIsPolling(false), []);
+
+    return {
+      ...query,
+      isPolling,
+      startPolling,
+      stopPolling
+    };
+  };
+
+  return {
+    useAdvancedQuery,
+    useOptimisticMutation,
+    useBatchOperations,
+    useRealTimeData
+  };
 };
