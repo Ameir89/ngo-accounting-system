@@ -50,43 +50,36 @@ def create_app(config_name=None):
     config[config_name].init_app(app)
     
     # Security headers and HTTPS enforcement
-    if not app.debug:
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-        Talisman(app, force_https=True, strict_transport_security=True)
+    # if not app.debug:
+    #     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    #     Talisman(app, force_https=True, strict_transport_security=True)
     
     # Initialize extensions
     db.init_app(app)
-    ma = Marshmallow(app)
+    
+    # Setup CORS BEFORE registering blueprints
+    setup_cors(app)
+    
+    # ma = Marshmallow(app)
     
     # Enhanced JWT configuration
     jwt = JWTManager(app)
     jwt.init_app(app)
     
-    # Rate limiting
-    limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["1000 per day", "100 per hour"]
-    )
+    # # Rate limiting
+    # limiter = Limiter(
+    # get_remote_address,
+    # app=app,
+    # default_limits=["1000 per day", "100 per hour"]
+    # )
     
-    # Enhanced CORS configuration
-    # Load configuration
-    app.config.from_object(config['development'])
+   
     
-    # Setup CORS
-    setup_cors(app)
-    # CORS(app, 
-    #      origins=app.config.get('CORS_ORIGINS', ['http://localhost:3000']),
-    #      allow_headers=["Content-Type", "Authorization"],
-    #      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    #      supports_credentials=True,
-    #      max_age=3600)
+    # # Security manager
+    # security_manager = SecurityManager(app)
     
-    # Security manager
-    security_manager = SecurityManager(app)
-    
-    # Request validator
-    request_validator = RequestValidator()
+    # # Request validator
+    # request_validator = RequestValidator()
     
     # Setup logging
     setup_logging(app)
@@ -104,43 +97,57 @@ def create_app(config_name=None):
     def missing_token_callback(error):
         return jsonify({'message': 'Authorization token required'}), 401
     
-    # Request preprocessing
-    @app.before_request
-    def before_request():
-        # Security checks
-        if not security_manager.is_request_allowed(request):
-            return jsonify({'message': 'Request blocked by security policy'}), 403
+    # # Handle OPTIONS requests for all routes
+    # @app.before_request
+    # def handle_preflight():
+    #     if request.method == "OPTIONS":
+    #         response = jsonify()
+    #         response.headers.add("Access-Control-Allow-Origin", "*")
+    #         response.headers.add('Access-Control-Allow-Headers', "*")
+    #         response.headers.add('Access-Control-Allow-Methods', "*")
+    #         return response
+    
+    # # Request preprocessing
+    # @app.before_request
+    # def before_request():
+    #     # Security checks
+    #     if not security_manager.is_request_allowed(request):
+    #         return jsonify({'message': 'Request blocked by security policy'}), 403
         
-        # Rate limiting for sensitive endpoints
-        if request.endpoint and any(sensitive in request.endpoint for sensitive in ['auth', 'admin']):
-            # Apply stricter rate limiting
-            pass
+    #     # Rate limiting for sensitive endpoints
+    #     if request.endpoint and any(sensitive in request.endpoint for sensitive in ['auth', 'admin']):
+    #         # Apply stricter rate limiting
+    #         pass
         
-        # Log requests for audit
-        if request.method in ['POST', 'PUT', 'DELETE']:
-            app.logger.info(f"API Request: {request.method} {request.path} from {request.remote_addr}")
+    #     # Log requests for audit
+    #     if request.method in ['POST', 'PUT', 'DELETE']:
+    #         app.logger.info(f"API Request: {request.method} {request.path} from {request.remote_addr}")
     
     # Register blueprints with version prefix
     api_prefix = '/api/v1'
     
     app.register_blueprint(auth_bp, url_prefix=api_prefix)
-    app.register_blueprint(accounts_bp, url_prefix=api_prefix)
-    app.register_blueprint(journals_bp, url_prefix=api_prefix)
-    app.register_blueprint(reports_bp, url_prefix=api_prefix)
-    app.register_blueprint(grants_bp, url_prefix=api_prefix)
-    app.register_blueprint(suppliers_bp, url_prefix=api_prefix)
-    app.register_blueprint(assets_bp, url_prefix=api_prefix)
-    app.register_blueprint(projects_bp, url_prefix=api_prefix)
-    app.register_blueprint(cost_centers_bp, url_prefix=api_prefix)
-    app.register_blueprint(donors_bp, url_prefix=api_prefix)
-    app.register_blueprint(budgets_bp, url_prefix=api_prefix)
-    app.register_blueprint(currencies_bp, url_prefix=api_prefix)
-    app.register_blueprint(dashboard_bp, url_prefix=api_prefix)
-    app.register_blueprint(data_exchange_bp, url_prefix=api_prefix)
+    app.register_blueprint(accounts_bp, url_prefix=api_prefix + '/accounts')
+    app.register_blueprint(journals_bp, url_prefix=api_prefix + '/journal-entries')
+    app.register_blueprint(reports_bp, url_prefix=api_prefix + '/reports')
+    app.register_blueprint(grants_bp, url_prefix=api_prefix + '/grants')
+    app.register_blueprint(suppliers_bp, url_prefix=api_prefix + '/suppliers')
+    app.register_blueprint(assets_bp, url_prefix=api_prefix + '/assets')
+    app.register_blueprint(projects_bp, url_prefix=api_prefix + '/projects')
+    app.register_blueprint(cost_centers_bp, url_prefix=api_prefix + '/cost-centers')
+    app.register_blueprint(donors_bp, url_prefix=api_prefix + '/donors')
+    app.register_blueprint(budgets_bp, url_prefix=api_prefix + '/budgets')
+    app.register_blueprint(currencies_bp, url_prefix=api_prefix + '/currencies')
+    app.register_blueprint(dashboard_bp, url_prefix=api_prefix + '/dashboard')
+    app.register_blueprint(data_exchange_bp, url_prefix=api_prefix + '/data-exchange')
+
+    print("Registered routes:")
+    for rule in app.url_map.iter_rules():
+        print(rule)
     
     # Enhanced health check endpoint
     @app.route('/health')
-    @limiter.limit("10 per minute")
+    # @limiter.limit("10 per minute")
     def health_check():
         try:
             # Check database connection

@@ -16,7 +16,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-
+// import * as serviceWorker from './serviceWorker';
+// serviceWorker.unregister();
 // Error boundary for the entire app
 class RootErrorBoundary extends React.Component {
   constructor(props) {

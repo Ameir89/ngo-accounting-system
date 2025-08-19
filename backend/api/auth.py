@@ -23,22 +23,24 @@ from utils.security import SecurityManager
 from utils.request_validator import RequestValidator
 from services.audit_service import log_audit_trail
 
-auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+auth_bp = Blueprint('auth', __name__)
+print(f"route is : {auth_bp.url_prefix}")
 validator = RequestValidator()
-security_manager = SecurityManager()
+# security_manager = SecurityManager()
 
 # Rate limiting for authentication endpoints
-limiter = Limiter(key_func=get_remote_address)
+# limiter = Limiter(key_func=get_remote_address)
 
 # Store for failed login attempts and temporary locks
 failed_attempts = {}
 temporary_locks = {}
 password_reset_tokens = {}
 
-@auth_bp.route('/login', methods=['POST'])
-@limiter.limit("5 per minute")  # Strict rate limiting for login
+@auth_bp.route('/auth/login', methods=['POST'])
+# @limiter.limit("5 per minute")  # Strict rate limiting for login
 @validator.validate_request('login')
 def login():
+    print("Login endpoint called")
     """Enhanced user authentication with security features"""
     data = request.validated_data
     client_ip = request.remote_addr
@@ -154,7 +156,7 @@ def login():
         }
     })
 
-@auth_bp.route('/refresh', methods=['POST'])
+@auth_bp.route('/auth/refresh', methods=['POST'])
 @jwt_required(refresh=True)
 def refresh():
     """Refresh access token"""
@@ -186,7 +188,7 @@ def refresh():
         'expires_in': 28800
     })
 
-@auth_bp.route('/logout', methods=['POST'])
+@auth_bp.route('/auth/logout', methods=['POST'])
 @jwt_required()
 def logout():
     """User logout with token blacklisting"""
@@ -200,9 +202,9 @@ def logout():
     
     return jsonify({'message': 'Logged out successfully'})
 
-@auth_bp.route('/change-password', methods=['POST'])
+@auth_bp.route('/auth/change-password', methods=['POST'])
 @jwt_required()
-@limiter.limit("3 per minute")
+# @limiter.limit("3 per minute")
 def change_password():
     """Change user password with enhanced security"""
     current_user_id = get_jwt_identity()
@@ -251,8 +253,8 @@ def change_password():
     
     return jsonify({'message': 'Password changed successfully'})
 
-@auth_bp.route('/forgot-password', methods=['POST'])
-@limiter.limit("3 per hour")
+@auth_bp.route('/auth/forgot-password', methods=['POST'])
+# @limiter.limit("3 per hour")
 def forgot_password():
     """Request password reset"""
     data = request.get_json()
@@ -281,8 +283,8 @@ def forgot_password():
     
     return jsonify({'message': 'If the email exists, a reset link has been sent'})
 
-@auth_bp.route('/reset-password', methods=['POST'])
-@limiter.limit("5 per hour")
+@auth_bp.route('/auth/reset-password', methods=['POST'])
+# @limiter.limit("5 per hour")
 def reset_password():
     """Reset password using token"""
     data = request.get_json()
@@ -330,7 +332,7 @@ def reset_password():
     
     return jsonify({'message': 'Password reset successfully'})
 
-@auth_bp.route('/enable-2fa', methods=['POST'])
+@auth_bp.route('/auth/enable-2fa', methods=['POST'])
 @jwt_required()
 def enable_2fa():
     """Enable two-factor authentication"""
@@ -368,7 +370,7 @@ def enable_2fa():
         'instructions': 'Scan the QR code with your authenticator app or enter the key manually'
     })
 
-@auth_bp.route('/verify-2fa', methods=['POST'])
+@auth_bp.route('/auth/verify-2fa', methods=['POST'])
 @jwt_required()
 def verify_2fa():
     """Verify and enable 2FA"""

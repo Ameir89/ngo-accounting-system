@@ -6,7 +6,7 @@ from datetime import datetime, date
 from models import db, Account, AccountType, JournalEntry, JournalEntryLine
 from utils.decorators import check_permission
 
-reports_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
+reports_bp = Blueprint('reports', __name__)
 
 @reports_bp.route('/trial-balance', methods=['GET'])
 @check_permission('reports_read')

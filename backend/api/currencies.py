@@ -8,7 +8,7 @@ from models import db, Currency, ExchangeRate
 from utils.decorators import check_permission
 from services.audit_service import log_audit_trail
 
-currencies_bp = Blueprint('currencies', __name__, url_prefix='/api/currencies')
+currencies_bp = Blueprint('currencies', __name__)
 
 @currencies_bp.route('', methods=['GET'])
 @check_permission('currency_read')

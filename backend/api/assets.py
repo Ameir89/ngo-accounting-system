@@ -11,7 +11,7 @@ from utils.request_validator import RequestValidator
 from services.audit_service import log_audit_trail
 from services.financial_calculations import FinancialCalculationService
 
-assets_bp = Blueprint('assets', __name__, url_prefix='/api/assets')
+assets_bp = Blueprint('assets', __name__)
 validator = RequestValidator()
 
 @assets_bp.route('', methods=['GET'])

@@ -10,7 +10,7 @@ from models import db, JournalEntry, JournalEntryLine, JournalEntryType, Account
 from utils.decorators import check_permission
 from services.audit_service import log_audit_trail
 
-journals_bp = Blueprint('journals', __name__, url_prefix='/api/journal-entries')
+journals_bp = Blueprint('journals', __name__)
 
 @journals_bp.route('', methods=['GET'])
 @check_permission('journal_read')

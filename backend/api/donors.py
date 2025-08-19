@@ -6,7 +6,7 @@ from models import GrantStatus, db, Donor, Grant
 from utils.decorators import check_permission
 from services.audit_service import log_audit_trail
 
-donors_bp = Blueprint('donors', __name__, url_prefix='/api/donors')
+donors_bp = Blueprint('donors', __name__)
 
 @donors_bp.route('', methods=['GET'])
 @check_permission('donor_read')

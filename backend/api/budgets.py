@@ -13,7 +13,7 @@ from utils.request_validator import RequestValidator
 from services.audit_service import log_audit_trail
 from services.financial_calculations import FinancialCalculationService
 
-budgets_bp = Blueprint('budgets', __name__, url_prefix='/api/budgets')
+budgets_bp = Blueprint('budgets', __name__)
 validator = RequestValidator()
 
 @budgets_bp.route('', methods=['GET'])

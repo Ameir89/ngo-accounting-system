@@ -9,7 +9,7 @@ from utils.decorators import check_permission
 from utils.request_validator import RequestValidator
 from services.audit_service import log_audit_trail
 
-projects_bp = Blueprint('projects', __name__, url_prefix='/api/projects')
+projects_bp = Blueprint('projects', __name__)
 validator = RequestValidator()
 
 @projects_bp.route('', methods=['GET'])

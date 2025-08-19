@@ -8,7 +8,7 @@ from models import db, Account, AccountType, User
 from utils.decorators import check_permission
 from services.audit_service import log_audit_trail
 
-accounts_bp = Blueprint('accounts', __name__, url_prefix='/api/accounts')
+accounts_bp = Blueprint('accounts', __name__)
 
 @accounts_bp.route('', methods=['GET'])
 @check_permission('account_read')

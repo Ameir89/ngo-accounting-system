@@ -8,7 +8,7 @@ from models import db, Supplier, PurchaseOrder, SupplierInvoice
 from utils.decorators import check_permission
 from services.audit_service import log_audit_trail
 
-suppliers_bp = Blueprint('suppliers', __name__, url_prefix='/api/suppliers')
+suppliers_bp = Blueprint('suppliers', __name__)
 
 @suppliers_bp.route('', methods=['GET'])
 @check_permission('supplier_read')

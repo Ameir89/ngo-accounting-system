@@ -7,7 +7,7 @@ from sqlalchemy import func, and_
 from datetime import datetime, date
 from utils.decorators import check_permission
 
-grants_bp = Blueprint('grants', __name__, url_prefix='/api/grants')
+grants_bp = Blueprint('grants', __name__)
 
 @grants_bp.route('', methods=['GET'])
 @check_permission('grant_read')

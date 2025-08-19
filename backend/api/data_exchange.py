@@ -11,7 +11,7 @@ from services.data_exchange_service import DataExchangeService
 from services.report_generator import EnhancedReportGenerator
 from utils.request_validator import RequestValidator
 
-data_exchange_bp = Blueprint('data_exchange', __name__, url_prefix='/api/data-exchange')
+data_exchange_bp = Blueprint('data_exchange', __name__)
 validator = RequestValidator()
 
 # Allowed file extensions

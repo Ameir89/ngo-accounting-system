@@ -1,21 +1,21 @@
 // frontend/src/services/api.js
 import axios from 'axios';
-import toast from 'react-hot-toast';
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1',
   timeout: 30000,
-  withCredentials: true, // Important for CORS with credentials
+  withCredentials: true, // Set to true if you need cookies
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    // Add auth token if available
+    const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -26,35 +26,64 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for error handling
+// Response interceptor
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
-    const { response } = error;
-    
-    if (response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
+    if (error.response?.status === 401) {
+      // Handle unauthorized access
+      localStorage.removeItem('access_token');
       window.location.href = '/login';
-      return Promise.reject(error);
     }
-    
-    if (response?.status === 403) {
-      toast.error('You do not have permission to perform this action');
-    } else if (response?.status === 500) {
-      toast.error('Internal server error. Please try again later.');
-    } else if (response?.data?.message) {
-      toast.error(response.data.message);
-    } else if (error.message) {
-      toast.error(error.message);
-    }
-    
     return Promise.reject(error);
   }
 );
+
+// // Request interceptor to add auth token
+// api.interceptors.request.use(
+//   (config) => {
+//     const token = localStorage.getItem('authToken');
+//     if (token) {
+//       config.headers.Authorization = `Bearer ${token}`;
+//     }
+//     return config;
+//   },
+//   (error) => {
+//     return Promise.reject(error);
+//   }
+// );
+
+// // Response interceptor for error handling
+// api.interceptors.response.use(
+//   (response) => {
+//     return response;
+//   },
+//   (error) => {
+//     const { response } = error;
+    
+//     if (response?.status === 401) {
+//       // Unauthorized - clear token and redirect to login
+//       localStorage.removeItem('authToken');
+//       localStorage.removeItem('user');
+//       window.location.href = '/login';
+//       return Promise.reject(error);
+//     }
+    
+//     if (response?.status === 403) {
+//       toast.error('You do not have permission to perform this action');
+//     } else if (response?.status === 500) {
+//       toast.error('Internal server error. Please try again later.');
+//     } else if (response?.data?.message) {
+//       toast.error(response.data.message);
+//     } else if (error.message) {
+//       toast.error(error.message);
+//     }
+    
+//     return Promise.reject(error);
+//   }
+// );
 
 // API service methods
 export const apiService = {

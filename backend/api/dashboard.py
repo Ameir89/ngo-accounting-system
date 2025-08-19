@@ -10,7 +10,7 @@ from models import (
 from utils.decorators import check_permission
 from services.analytics_service import AdvancedAnalyticsService
 
-dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
+dashboard_bp = Blueprint('dashboard', __name__)
 
 @dashboard_bp.route('/overview', methods=['GET'])
 @check_permission('dashboard_read')

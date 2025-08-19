@@ -6,7 +6,7 @@ from models import db, CostCenter, Project
 from utils.decorators import check_permission
 from services.audit_service import log_audit_trail
 
-cost_centers_bp = Blueprint('cost_centers', __name__, url_prefix='/api/cost-centers')
+cost_centers_bp = Blueprint('cost_centers', __name__)
 
 @cost_centers_bp.route('', methods=['GET'])
 @check_permission('cost_center_read')
