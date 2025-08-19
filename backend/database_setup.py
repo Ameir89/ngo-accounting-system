@@ -8,11 +8,21 @@ from sqlalchemy import text
 from models import db, Role, User, Currency, Account, AccountType, OrganizationSettings
 from werkzeug.security import generate_password_hash
 from datetime import date
+from dotenv import load_dotenv
+
 
 def create_app():
     """Create Flask app for database setup"""
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///accounting.db'
+    load_dotenv()
+    database_url = os.environ.get('DATABASE_URL')
+
+    if not database_url:
+        raise ValueError("❌ DATABASE_URL environment variable not set!")
+
+    print(f"✅ Using database URL: {database_url}")
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = 'dev-secret-key'
     
