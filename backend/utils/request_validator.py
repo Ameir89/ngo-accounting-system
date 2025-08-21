@@ -1,4 +1,5 @@
 # backend/utils/request_validator.py
+import logging
 from marshmallow import Schema, fields, validate, ValidationError
 from flask import request, jsonify
 from functools import wraps
@@ -110,11 +111,13 @@ class RequestValidator:
                     return f(*args, **kwargs)
                     
                 except ValidationError as err:
+                    print(f"Request validation error: {err.messages}")
                     return jsonify({
                         'message': 'Validation failed',
                         'errors': err.messages
                     }), 400
                 except Exception as e:
+                    print(f"Request exception validation error: {str(e)}")
                     return jsonify({
                         'message': 'Request validation error',
                         'error': str(e)

@@ -177,6 +177,7 @@ export const apiService = {
       localStorage.setItem('user', JSON.stringify(user));
       return { token: access_token, user };
     },
+    
     logout: async () => {
       try {
         await api.post('/auth/logout');
@@ -185,13 +186,21 @@ export const apiService = {
       localStorage.removeItem('user');
       window.location.href = '/login';
     },
+    
     getMe: () => api.get('/auth/me'),
+    
     refreshToken: () => api.post('/auth/refresh'),
+    
+    changePassword: (passwordData) => api.put('/auth/change-password', passwordData),
+    
+    forgotPassword: (data) => api.post('/auth/forgot-password', data),
+    
+    resetPassword: (data) => api.post('/auth/reset-password', data),
   },
 
   // Dashboard example
   dashboard: {
-    getSummary: (params = {}) => api.get('/dashboard/overview', { params }),
+    getOverview: (params = {}) => api.get('/dashboard/overview', { params }),
     getFinancialSummary: (params = {}) => api.get('/dashboard/financial-summary', { params }),
     getRevenueChart: (params = {}) => api.get('/dashboard/charts/revenue-trend', { params }),
     getExpenseChart: (params = {}) => api.get('/dashboard/charts/expense-breakdown', { params }),
@@ -209,6 +218,33 @@ export const apiService = {
         expenseChart: results[3].status === 'fulfilled' ? results[3].value.data : null,
       };
     },
+  },
+
+  // Journal Entries
+  journalEntries: {
+    getAll: (params = {}) => api.get('/journal-entries', { params }),
+    getById: (id) => api.get(`/journal-entries/${id}`),
+    create: (data) => api.post('/journal-entries', data),
+    update: (id, data) => api.put(`/journal-entries/${id}`, data),
+    delete: (id) => api.delete(`/journal-entries/${id}`),
+    post: (id) => api.post(`/journal-entries/${id}/post`),
+  },
+
+  // Accounts
+  accounts: {
+    getAll: (params = {}) => api.get('/accounts', { params }),
+    getById: (id) => api.get(`/accounts/${id}`),
+    create: (data) => api.post('/accounts', data),
+    update: (id, data) => api.put(`/accounts/${id}`, data),
+    delete: (id) => api.delete(`/accounts/${id}`),
+  },
+
+  // Reports
+  reports: {
+    getTrialBalance: (params = {}) => api.get('/reports/trial-balance', { params }),
+    getIncomeStatement: (params = {}) => api.get('/reports/income-statement', { params }),
+    getBalanceSheet: (params = {}) => api.get('/reports/balance-sheet', { params }),
+    getCashFlow: (params = {}) => api.get('/reports/cash-flow', { params }),
   },
 };
 

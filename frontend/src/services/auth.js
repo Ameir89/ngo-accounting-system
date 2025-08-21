@@ -1,4 +1,4 @@
-// frontend/src/services/auth.js - Enhanced with better error handling and integration
+// frontend/src/services/auth.js - Enhanced with better error handling (RememberMe removed)
 import { apiService } from './api';
 
 // Auth service utilities
@@ -6,7 +6,6 @@ const AUTH_STORAGE_KEYS = {
   TOKEN: 'authToken',
   USER: 'user',
   REFRESH_TOKEN: 'refreshToken',
-  REMEMBER_ME: 'rememberMe',
 };
 
 // Token validation utility
@@ -33,13 +32,12 @@ const validateToken = (token) => {
   }
 };
 
-// Secure storage utilities
+// Secure storage utilities (always use localStorage for persistence)
 const secureStorage = {
-  setItem: (key, value, remember = false) => {
+  setItem: (key, value) => {
     try {
-      const storage = remember ? localStorage : sessionStorage;
       const serializedValue = typeof value === 'string' ? value : JSON.stringify(value);
-      storage.setItem(key, serializedValue);
+      localStorage.setItem(key, serializedValue);
       return true;
     } catch (error) {
       console.error(`Failed to store ${key}:`, error);
@@ -49,8 +47,7 @@ const secureStorage = {
 
   getItem: (key, defaultValue = null) => {
     try {
-      // Check both localStorage and sessionStorage
-      let item = localStorage.getItem(key) || sessionStorage.getItem(key);
+      const item = localStorage.getItem(key);
       
       if (!item) return defaultValue;
       
@@ -69,7 +66,6 @@ const secureStorage = {
   removeItem: (key) => {
     try {
       localStorage.removeItem(key);
-      sessionStorage.removeItem(key);
       return true;
     } catch (error) {
       console.error(`Failed to remove ${key}:`, error);
@@ -81,12 +77,10 @@ const secureStorage = {
     try {
       Object.values(AUTH_STORAGE_KEYS).forEach(key => {
         localStorage.removeItem(key);
-        sessionStorage.removeItem(key);
       });
       
       // Clear any other auth-related items
       localStorage.removeItem('securityEvents');
-      sessionStorage.removeItem('securityEvents');
       
       return true;
     } catch (error) {
@@ -103,7 +97,7 @@ export const authService = {
    */
   login: async (credentials) => {
     try {
-      const { username, password, rememberMe = false } = credentials;
+      const { username, password } = credentials;
       
       if (!username || !password) {
         throw new Error('Username and password are required');
@@ -117,13 +111,12 @@ export const authService = {
         throw new Error('Invalid login response from server');
       }
 
-      // Store authentication data
-      secureStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, token, rememberMe);
-      secureStorage.setItem(AUTH_STORAGE_KEYS.USER, user, rememberMe);
-      secureStorage.setItem(AUTH_STORAGE_KEYS.REMEMBER_ME, rememberMe, rememberMe);
+      // Store authentication data in localStorage
+      secureStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, token);
+      secureStorage.setItem(AUTH_STORAGE_KEYS.USER, user);
 
       // Log successful login
-      authService.logSecurityEvent('LOGIN_SUCCESS', { username, rememberMe });
+      authService.logSecurityEvent('LOGIN_SUCCESS', { username });
 
       return { token, user };
     } catch (error) {
@@ -248,8 +241,7 @@ export const authService = {
       const user = response.data;
       
       if (user) {
-        const rememberMe = secureStorage.getItem(AUTH_STORAGE_KEYS.REMEMBER_ME, false);
-        secureStorage.setItem(AUTH_STORAGE_KEYS.USER, user, rememberMe);
+        secureStorage.setItem(AUTH_STORAGE_KEYS.USER, user);
         
         authService.logSecurityEvent('USER_DATA_REFRESHED', { userId: user.id });
         return user;
@@ -288,9 +280,8 @@ export const authService = {
       }
 
       const updatedUser = { ...currentUser, ...userData };
-      const rememberMe = secureStorage.getItem(AUTH_STORAGE_KEYS.REMEMBER_ME, false);
       
-      const success = secureStorage.setItem(AUTH_STORAGE_KEYS.USER, updatedUser, rememberMe);
+      const success = secureStorage.setItem(AUTH_STORAGE_KEYS.USER, updatedUser);
       
       if (success) {
         authService.logSecurityEvent('USER_DATA_UPDATED', { userId: updatedUser.id });
@@ -317,8 +308,7 @@ export const authService = {
       const { access_token } = response.data;
 
       if (access_token) {
-        const rememberMe = secureStorage.getItem(AUTH_STORAGE_KEYS.REMEMBER_ME, false);
-        secureStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, access_token, rememberMe);
+        secureStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, access_token);
         
         authService.logSecurityEvent('TOKEN_REFRESHED');
         return access_token;
