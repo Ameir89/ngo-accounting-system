@@ -140,7 +140,7 @@ const tokenManager = new TokenManager();
 // -----------------------------
 const API_CONFIG = {
   development: {
-    baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1',
+    baseURL: process.env.REACT_APP_API_URL || 'http://188.34.167.110:5013/api/v1',
     timeout: 30000,
   },
   production: {

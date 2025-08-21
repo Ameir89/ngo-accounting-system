@@ -1,7 +1,10 @@
 # backend/config.py
+from dotenv import load_dotenv
 import os
 from datetime import timedelta
 
+# Load .env file
+load_dotenv()
 class Config:
     """Base configuration"""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
