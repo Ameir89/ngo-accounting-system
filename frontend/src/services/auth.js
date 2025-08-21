@@ -1,11 +1,12 @@
-// frontend/src/services/auth.js - Enhanced with better error handling (RememberMe removed)
-import { apiService } from './api';
+// frontend/src/services/auth.js - Enhanced with Token Refresh Support
+import { apiService, tokenUtils } from './api';
 
 // Auth service utilities
 const AUTH_STORAGE_KEYS = {
   TOKEN: 'authToken',
-  USER: 'user',
   REFRESH_TOKEN: 'refreshToken',
+  USER: 'user',
+  TOKEN_EXPIRY: 'tokenExpiry',
 };
 
 // Token validation utility
@@ -32,7 +33,7 @@ const validateToken = (token) => {
   }
 };
 
-// Secure storage utilities (always use localStorage for persistence)
+// Enhanced secure storage utilities
 const secureStorage = {
   setItem: (key, value) => {
     try {
@@ -79,7 +80,7 @@ const secureStorage = {
         localStorage.removeItem(key);
       });
       
-      // Clear any other auth-related items
+      // Clear other auth-related items
       localStorage.removeItem('securityEvents');
       
       return true;
@@ -103,17 +104,13 @@ export const authService = {
         throw new Error('Username and password are required');
       }
 
-      // Call API login
+      // Call API login (this will automatically store tokens via the API service)
       const response = await apiService.auth.login({ username, password });
       const { token, user } = response;
 
       if (!token || !user) {
         throw new Error('Invalid login response from server');
       }
-
-      // Store authentication data in localStorage
-      secureStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, token);
-      secureStorage.setItem(AUTH_STORAGE_KEYS.USER, user);
 
       // Log successful login
       authService.logSecurityEvent('LOGIN_SUCCESS', { username });
@@ -141,27 +138,15 @@ export const authService = {
       // Log logout event
       authService.logSecurityEvent('LOGOUT', { reason, username: user?.username });
 
-      // Try to call logout API (don't wait for it)
-      try {
-        await apiService.auth.logout();
-      } catch (error) {
-        console.warn('Logout API call failed:', error);
-      }
-      
-      // Clear all auth data
-      secureStorage.clear();
-      
-      // Force redirect to login
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
+      // Call API logout (this will clear tokens automatically)
+      await apiService.auth.logout();
       
       return true;
     } catch (error) {
       console.error('Logout error:', error);
       
       // Force clear session even if logout fails
-      secureStorage.clear();
+      tokenUtils.clearTokens();
       
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
@@ -196,26 +181,17 @@ export const authService = {
   },
 
   /**
-   * Get authentication token
+   * Get authentication token (uses the enhanced token utils)
    */
   getToken: () => {
-    try {
-      const token = secureStorage.getItem(AUTH_STORAGE_KEYS.TOKEN);
-      
-      if (!token) return null;
-      
-      // Validate token before returning
-      if (validateToken(token)) {
-        return token;
-      } else {
-        console.warn('Invalid or expired token, clearing storage');
-        authService.clearSession();
-        return null;
-      }
-    } catch (error) {
-      console.error('Error getting token:', error);
-      return null;
-    }
+    return tokenUtils.getAccessToken();
+  },
+
+  /**
+   * Get refresh token
+   */
+  getRefreshToken: () => {
+    return tokenUtils.getRefreshToken();
   },
 
   /**
@@ -225,6 +201,21 @@ export const authService = {
     const token = authService.getToken();
     const user = authService.getCurrentUser();
     return !!(token && user);
+  },
+
+  /**
+   * Check if token is valid (uses enhanced token utils)
+   */
+  isTokenValid: () => {
+    const token = authService.getToken();
+    return validateToken(token);
+  },
+
+  /**
+   * Check if token is expired (uses enhanced token utils)
+   */
+  isTokenExpired: () => {
+    return tokenUtils.isTokenExpired();
   },
 
   /**
@@ -251,15 +242,28 @@ export const authService = {
     } catch (error) {
       console.error('Failed to refresh user data:', error);
       
-      // If it's an auth error, clear the session
-      if (error.response?.status === 401) {
-        console.warn('Authentication failed during refresh, logging out');
-        await authService.logout('auth_failed');
-        return null;
-      }
-      
+      // If it's an auth error, the interceptor will handle logout
       // For other errors, return null but don't logout
       return null;
+    }
+  },
+
+  /**
+   * Manually refresh access token
+   */
+  refreshToken: async () => {
+    try {
+      const newToken = await tokenUtils.refreshToken();
+      
+      if (newToken) {
+        authService.logSecurityEvent('MANUAL_TOKEN_REFRESH');
+        return newToken;
+      }
+      
+      throw new Error('No new token received');
+    } catch (error) {
+      console.error('Manual token refresh failed:', error);
+      throw error;
     }
   },
 
@@ -291,36 +295,6 @@ export const authService = {
     } catch (error) {
       console.error('Error updating user data:', error);
       return false;
-    }
-  },
-
-  /**
-   * Refresh authentication token
-   */
-  refreshToken: async () => {
-    try {
-      const currentToken = authService.getToken();
-      if (!currentToken) {
-        throw new Error('No token to refresh');
-      }
-
-      const response = await apiService.auth.refreshToken();
-      const { access_token } = response.data;
-
-      if (access_token) {
-        secureStorage.setItem(AUTH_STORAGE_KEYS.TOKEN, access_token);
-        
-        authService.logSecurityEvent('TOKEN_REFRESHED');
-        return access_token;
-      }
-
-      throw new Error('No new token received');
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      
-      // If refresh fails, logout user
-      await authService.logout('token_refresh_failed');
-      throw error;
     }
   },
 
@@ -391,19 +365,11 @@ export const authService = {
   },
 
   /**
-   * Validate token without API call
-   */
-  isTokenValid: () => {
-    const token = secureStorage.getItem(AUTH_STORAGE_KEYS.TOKEN);
-    return validateToken(token);
-  },
-
-  /**
    * Clear session data
    */
   clearSession: () => {
     try {
-      secureStorage.clear();
+      tokenUtils.clearTokens();
       authService.logSecurityEvent('SESSION_CLEARED');
       return true;
     } catch (error) {
@@ -538,6 +504,36 @@ export const authService = {
         }
       });
     };
+  },
+
+  /**
+   * Get token information for debugging
+   */
+  getTokenInfo: () => {
+    const accessToken = authService.getToken();
+    const refreshToken = authService.getRefreshToken();
+    
+    return {
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      isTokenValid: authService.isTokenValid(),
+      isTokenExpired: authService.isTokenExpired(),
+      user: authService.getCurrentUser(),
+    };
+  },
+
+  /**
+   * Force token refresh (for testing/debugging)
+   */
+  forceRefresh: async () => {
+    try {
+      const newToken = await authService.refreshToken();
+      console.log('✅ Force refresh successful');
+      return newToken;
+    } catch (error) {
+      console.error('❌ Force refresh failed:', error);
+      throw error;
+    }
   }
 };
 
