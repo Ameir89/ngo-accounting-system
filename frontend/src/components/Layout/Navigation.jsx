@@ -1,200 +1,449 @@
-// frontend/src/components/Layout/Navigation.jsx
+// frontend/src/components/Layout/EnhancedNavigation.jsx
 import {
-  BookOpen, ChevronDown, DollarSign,
-  FileText, Home, Settings
+  Activity,
+  BarChart3,
+  Bell,
+  BookOpen,
+  Building2,
+  ChevronDown,
+  Database,
+  DollarSign,
+  FileSpreadsheet,
+  FileText,
+  HelpCircle,
+  Home,
+  Layers,
+  Search,
+  Settings,
+  Shield,
+  Target,
+  TrendingUp,
+  Users,
+  Wallet
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
 
-const Navigation = () => {
+const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
   const { hasPermission } = useAuth();
   const [expandedSections, setExpandedSections] = useState({
     generalLedger: true,
     finance: false,
+    reports: false,
+    administration: false,
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredItems, setFilteredItems] = useState([]);
+  const searchRef = useRef(null);
 
-  const toggleSection = (sectionKey) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey]
-    }));
-  };
-
-  const navigationItems = [
+  const navigationSections = [
     {
-      name: t('dashboard'),
-      href: '/',
-      icon: Home,
-      permission: 'dashboard_read',
+      id: 'overview',
+      title: t('Overview'),
+      icon: Activity,
+      items: [
+        {
+          name: t('dashboard'),
+          href: '/',
+          icon: Home,
+          permission: 'dashboard_read',
+          description: 'Financial overview and key metrics',
+          badge: null,
+        }
+      ]
     },
     {
-      name: t('generalLedger'),
+      id: 'generalLedger',
+      title: t('General Ledger'),
       icon: BookOpen,
-      key: 'generalLedger',
-      children: [
+      color: 'blue',
+      items: [
         {
           name: t('chartOfAccounts'),
           href: '/accounts',
+          icon: Layers,
           permission: 'account_read',
+          description: 'Manage chart of accounts',
+          badge: null,
         },
         {
           name: t('journalEntries'),
           href: '/journal-entries',
+          icon: FileText,
           permission: 'journal_read',
+          description: 'Record financial transactions',
+          badge: null,
         },
         {
           name: t('costCenters'),
           href: '/cost-centers',
+          icon: Target,
           permission: 'cost_center_read',
+          description: 'Organize expenses by department',
+          badge: null,
         },
         {
           name: t('projects'),
           href: '/projects',
+          icon: Building2,
           permission: 'project_read',
+          description: 'Track project finances',
+          badge: null,
         },
       ],
     },
     {
-      name: t('finance'),
+      id: 'finance',
+      title: t('Finance & Operations'),
       icon: DollarSign,
-      key: 'finance',
-      children: [
+      color: 'green',
+      items: [
         {
           name: t('budgets'),
           href: '/budgets',
+          icon: BarChart3,
           permission: 'budget_read',
+          description: 'Plan and track budgets',
+          badge: null,
         },
         {
           name: t('grants'),
           href: '/grants',
+          icon: Wallet,
           permission: 'grant_read',
+          description: 'Manage grants and funding',
+          badge: 'Hot',
         },
         {
           name: t('suppliers'),
           href: '/suppliers',
+          icon: Users,
           permission: 'supplier_read',
-        },
-        {
-          name: t('receipts'),
-          href: '/receipts',
-          permission: 'receipt_read',
+          description: 'Vendor management',
+          badge: null,
         },
         {
           name: t('fixedAssets'),
           href: '/fixed-assets',
+          icon: Database,
           permission: 'asset_read',
+          description: 'Asset tracking and depreciation',
+          badge: null,
         },
       ],
     },
     {
-      name: t('reports'),
-      href: '/reports',
-      icon: FileText,
-      permission: 'reports_read',
+      id: 'reports',
+      title: t('Reports & Analytics'),
+      icon: TrendingUp,
+      color: 'purple',
+      items: [
+        {
+          name: t('Financial Reports'),
+          href: '/reports',
+          icon: FileSpreadsheet,
+          permission: 'reports_read',
+          description: 'Generate financial statements',
+          badge: null,
+        },
+        {
+          name: t('Analytics Dashboard'),
+          href: '/analytics',
+          icon: BarChart3,
+          permission: 'reports_read',
+          description: 'Advanced data insights',
+          badge: 'New',
+        },
+        {
+          name: t('Audit Trail'),
+          href: '/audit',
+          icon: Shield,
+          permission: 'audit_read',
+          description: 'Track system changes',
+          badge: null,
+        },
+      ],
     },
     {
-      name: t('settings'),
-      href: '/settings',
+      id: 'administration',
+      title: t('Administration'),
       icon: Settings,
-      permission: 'settings_read',
+      color: 'gray',
+      items: [
+        {
+          name: t('User Management'),
+          href: '/users',
+          icon: Users,
+          permission: 'user_read',
+          description: 'Manage user accounts',
+          badge: null,
+        },
+        {
+          name: t('System Settings'),
+          href: '/settings',
+          icon: Settings,
+          permission: 'settings_read',
+          description: 'Configure system preferences',
+          badge: null,
+        },
+        {
+          name: t('Notifications'),
+          href: '/notifications',
+          icon: Bell,
+          permission: 'notification_read',
+          description: 'Manage alerts and notifications',
+          badge: '3',
+        },
+      ],
     },
   ];
 
+  const toggleSection = (sectionId) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
+
   const isCurrentPath = (href) => {
-    return location.pathname === href;
+    if (href === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(href);
   };
 
-  const isParentActive = (children) => {
-    return children?.some(child => isCurrentPath(child.href));
+  const isParentActive = (items) => {
+    return items?.some(item => isCurrentPath(item.href));
   };
 
-  const NavigationItem = ({ item }) => {
+  const getColorClasses = (color, isActive = false) => {
+    const colors = {
+      blue: {
+        bg: isActive ? 'bg-blue-50 dark:bg-blue-900/20' : '',
+        text: isActive ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400',
+        icon: isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400',
+        border: isActive ? 'border-blue-200 dark:border-blue-700' : '',
+      },
+      green: {
+        bg: isActive ? 'bg-green-50 dark:bg-green-900/20' : '',
+        text: isActive ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400',
+        icon: isActive ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400',
+        border: isActive ? 'border-green-200 dark:border-green-700' : '',
+      },
+      purple: {
+        bg: isActive ? 'bg-purple-50 dark:bg-purple-900/20' : '',
+        text: isActive ? 'text-purple-700 dark:text-purple-300' : 'text-gray-600 dark:text-gray-400',
+        icon: isActive ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400',
+        border: isActive ? 'border-purple-200 dark:border-purple-700' : '',
+      },
+      gray: {
+        bg: isActive ? 'bg-gray-50 dark:bg-gray-700' : '',
+        text: isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400',
+        icon: isActive ? 'text-gray-700 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400',
+        border: isActive ? 'border-gray-200 dark:border-gray-600' : '',
+      },
+    };
+    return colors[color] || colors.gray;
+  };
+
+  // Search functionality
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = [];
+      navigationSections.forEach(section => {
+        section.items.forEach(item => {
+          if (
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.description.toLowerCase().includes(searchQuery.toLowerCase())
+          ) {
+            filtered.push({ ...item, section: section.title });
+          }
+        });
+      });
+      setFilteredItems(filtered);
+    } else {
+      setFilteredItems([]);
+    }
+  }, [searchQuery, navigationSections]);
+
+  const NavigationSection = ({ section }) => {
+    if (!section.items?.some(item => hasPermission(item.permission))) {
+      return null;
+    }
+
+    const isExpanded = expandedSections[section.id];
+    const isActive = isParentActive(section.items);
+    const colorClasses = getColorClasses(section.color, isActive);
+    const SectionIcon = section.icon;
+
+    return (
+      <div className={`mb-2 ${section.id === 'overview' ? 'mb-6' : ''}`}>
+        {section.id !== 'overview' && (
+          <button
+            onClick={() => toggleSection(section.id)}
+            className={`
+              w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg 
+              transition-all duration-200 group hover:bg-gray-50 dark:hover:bg-gray-700/50
+              ${colorClasses.bg} ${colorClasses.text}
+            `}
+          >
+            <div className="flex items-center space-x-3">
+              <SectionIcon className={`h-5 w-5 ${colorClasses.icon}`} />
+              <span className="font-semibold">{section.title}</span>
+            </div>
+            <ChevronDown
+              className={`h-4 w-4 transform transition-transform duration-200 ${
+                isExpanded ? 'rotate-180' : ''
+              } ${colorClasses.icon}`}
+            />
+          </button>
+        )}
+        
+        {(isExpanded || section.id === 'overview') && (
+          <div className={`space-y-1 ${section.id !== 'overview' ? 'mt-2 ml-2' : ''}`}>
+            {section.items.map((item) => (
+              <NavigationItem 
+                key={item.href} 
+                item={item} 
+                sectionColor={section.color}
+                onItemClick={onItemClick}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const NavigationItem = ({ item, sectionColor, onItemClick }) => {
     if (!hasPermission(item.permission)) {
       return null;
     }
 
-    if (item.children) {
-      const isExpanded = expandedSections[item.key];
-      const isActive = isParentActive(item.children);
-
-      return (
-        <div>
-          <button
-            onClick={() => toggleSection(item.key)}
-            className={`group w-full flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-              isActive
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-            }`}
-          >
-            <item.icon className="mr-3 h-6 w-6 flex-shrink-0" />
-            <span className="flex-1">{item.name}</span>
-            <ChevronDown
-              className={`ml-3 h-5 w-5 transform transition-transform duration-200 ${
-                isExpanded ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
-          {isExpanded && (
-            <div className="mt-1 space-y-1">
-              {item.children.map((child) => (
-                <NavigationSubItem key={child.href} item={child} />
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
+    const isActive = isCurrentPath(item.href);
+    const colorClasses = getColorClasses(sectionColor, isActive);
+    const ItemIcon = item.icon;
 
     return (
       <NavLink
         to={item.href}
-        className={({ isActive }) =>
-          `group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-            isActive
-              ? 'bg-gray-900 text-white'
-              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-          }`
-        }
+        onClick={onItemClick}
+        className={({ isActive }) => `
+          group flex items-center justify-between px-3 py-2.5 text-sm rounded-lg 
+          transition-all duration-200 hover:scale-[1.02] hover:shadow-sm
+          ${isActive 
+            ? `${colorClasses.bg} ${colorClasses.text} shadow-sm border ${colorClasses.border}` 
+            : `hover:bg-gray-50 dark:hover:bg-gray-700/50 ${colorClasses.text}`
+          }
+        `}
       >
-        <item.icon className="mr-3 h-6 w-6 flex-shrink-0" />
-        {item.name}
+        <div className="flex items-center space-x-3 min-w-0 flex-1">
+          <ItemIcon className={`h-4 w-4 flex-shrink-0 ${colorClasses.icon}`} />
+          <div className="min-w-0 flex-1">
+            <div className="font-medium truncate">{item.name}</div>
+            {!isMobile && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                {item.description}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {item.badge && (
+          <span className={`
+            inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+            ${item.badge === 'Hot' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
+              item.badge === 'New' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
+              'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+            }
+          `}>
+            {item.badge}
+          </span>
+        )}
       </NavLink>
     );
   };
 
-  const NavigationSubItem = ({ item }) => {
-    if (!hasPermission(item.permission)) {
-      return null;
-    }
+  const SearchResults = () => {
+    if (!searchQuery.trim() || filteredItems.length === 0) return null;
 
     return (
-      <NavLink
-        to={item.href}
-        className={({ isActive }) =>
-          `group flex items-center pl-11 pr-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-            isActive
-              ? 'bg-gray-900 text-white'
-              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-          }`
-        }
-      >
-        {item.name}
-      </NavLink>
+      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+          Search Results
+        </div>
+        <div className="space-y-1">
+          {filteredItems.slice(0, 5).map((item) => (
+            <NavLink
+              key={item.href}
+              to={item.href}
+              onClick={() => {
+                setSearchQuery('');
+                onItemClick?.();
+              }}
+              className="block px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-600"
+            >
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {item.name}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                in {item.section}
+              </div>
+            </NavLink>
+          ))}
+        </div>
+      </div>
     );
   };
 
   return (
-    <nav className="mt-5 flex-1 px-2 space-y-1">
-      {navigationItems.map((item) => (
-        <NavigationItem key={item.name} item={item} />
-      ))}
+    <nav className="space-y-1 px-3 py-4">
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            ref={searchRef}
+            type="text"
+            placeholder={t('Search navigation...')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="
+              block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-600 
+              rounded-lg bg-white dark:bg-gray-700 text-sm
+              focus:ring-2 focus:ring-blue-500 focus:border-transparent
+              dark:text-white placeholder-gray-400 dark:placeholder-gray-500
+            "
+          />
+        </div>
+        <SearchResults />
+      </div>
+
+      {/* Navigation Sections */}
+      <div className="space-y-1">
+        {navigationSections.map((section) => (
+          <NavigationSection key={section.id} section={section} />
+        ))}
+      </div>
+
+      {/* Quick Help */}
+      <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+        <button className="
+          w-full flex items-center space-x-3 px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400
+          rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200
+        ">
+          <HelpCircle className="h-4 w-4" />
+          <span>Help & Support</span>
+        </button>
+      </div>
     </nav>
   );
 };
 
-export default Navigation;
+export default EnhancedNavigation;
