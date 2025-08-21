@@ -199,7 +199,8 @@ export const apiService = {
         throw new Error(error.response?.data?.message || 'Login failed');
       }
     },
-    
+    // ADD THIS MISSING METHOD
+    getMe: () => api.get('/auth/me'),
     logout: async () => {
       try {
         await api.post('/auth/logout');

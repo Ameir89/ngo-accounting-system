@@ -1,5 +1,5 @@
-// frontend/src/contexts/AuthContext.jsx
-import { createContext, useContext, useEffect, useState } from 'react';
+// frontend/src/contexts/AuthContext.jsx - Fixed version to prevent infinite loops
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { authService } from '../services/auth';
 
 const AuthContext = createContext();
@@ -15,31 +15,55 @@ export const useAuthContext = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Use ref to prevent infinite loops
+  const initializationRef = useRef(false);
 
-  useEffect(() => {
-    // Check if user is already logged in
-    const checkAuth = async () => {
-      try {
-        const savedUser = authService.getCurrentUser();
-        const token = authService.getToken();
-        
-        if (savedUser && token) {
-          // Verify token is still valid by fetching current user data
+  // Memoize the auth check function to prevent recreating on every render
+  const checkAuth = useCallback(async () => {
+    // Prevent multiple initialization attempts
+    if (initializationRef.current) return;
+    initializationRef.current = true;
+
+    try {
+      const savedUser = authService.getCurrentUser();
+      const token = authService.getToken();
+      
+      if (savedUser && token) {
+        // Try to refresh user data, but don't fail if it doesn't work
+        try {
           const userData = await authService.refreshUserData();
           setUser(userData || savedUser);
+        } catch (refreshError) {
+          console.warn('Failed to refresh user data, using cached user:', refreshError);
+          // Use cached user data if refresh fails
+          setUser(savedUser);
         }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        authService.logout();
-      } finally {
-        setLoading(false);
+      } else {
+        setUser(null);
       }
-    };
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      // Only logout if there was a real authentication error
+      if (error.response?.status === 401) {
+        authService.logout();
+      }
+      setUser(null);
+    } finally {
+      setLoading(false);
+      setIsInitialized(true);
+    }
+  }, []); // Empty dependency array is correct here
 
-    checkAuth();
-  }, []);
+  // Initialize auth state only once
+  useEffect(() => {
+    if (!isInitialized) {
+      checkAuth();
+    }
+  }, [checkAuth, isInitialized]);
 
-  const login = async (credentials) => {
+  const login = useCallback(async (credentials) => {
     try {
       setLoading(true);
       const { user: userData } = await authService.login(credentials);
@@ -50,19 +74,20 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
+    setLoading(false);
     authService.logout();
-  };
+  }, []);
 
-  const updateUser = (userData) => {
+  const updateUser = useCallback((userData) => {
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
-  };
+  }, []);
 
-  const hasPermission = (permission) => {
+  const hasPermission = useCallback((permission) => {
     if (!user || !user.role_name) return false;
     
     // Admin has all permissions
@@ -94,9 +119,10 @@ export const AuthProvider = ({ children }) => {
 
     const userPermissions = rolePermissions[user.role_name] || [];
     return userPermissions.includes(permission);
-  };
+  }, [user]);
 
-  const value = {
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = {
     user,
     loading,
     login,
@@ -107,7 +133,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

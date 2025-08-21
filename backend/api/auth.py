@@ -253,6 +253,32 @@ def change_password():
     
     return jsonify({'message': 'Password changed successfully'})
 
+@auth_bp.route('/auth/me', methods=['GET'])
+@jwt_required()
+def get_current_user():
+    """Get current user information"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or not user.is_active:
+        return jsonify({'message': 'User not found or inactive'}), 401
+    
+    import json
+    user_permissions = json.loads(user.role.permissions or '[]')
+    
+    return jsonify({
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'role_name': user.role.name,
+        'language': user.language,
+        'permissions': user_permissions,
+        'last_login': user.last_login.isoformat() if user.last_login else None,
+        'two_factor_enabled': getattr(user, 'two_factor_enabled', False)
+    })
+
 @auth_bp.route('/auth/forgot-password', methods=['POST'])
 # @limiter.limit("3 per hour")
 def forgot_password():

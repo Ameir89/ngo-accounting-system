@@ -1,6 +1,6 @@
-// frontend/src/contexts/SecurityContext.jsx
+// frontend/src/contexts/SecurityContext.jsx - Fixed version to prevent infinite loops
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 const SecurityContext = createContext();
@@ -15,7 +15,7 @@ export const useSecurityContext = () => {
 
 export const SecurityProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
-  const [securitySettings, setSecuritySettings] = useState({
+  const [securitySettings] = useState({
     sessionTimeout: 30 * 60 * 1000, // 30 minutes
     passwordPolicy: {
       minLength: 8,
@@ -31,48 +31,29 @@ export const SecurityProvider = ({ children }) => {
     encryptionEnabled: true
   });
   
+  // Use refs to prevent infinite loops
+  const sessionTimeoutRef = useRef(null);
+  const warningTimeoutRef = useRef(null);
+  const lastActivityRef = useRef(Date.now());
+  const isActiveRef = useRef(true);
+  
   const [sessionInfo, setSessionInfo] = useState({
     lastActivity: Date.now(),
     warningShown: false,
     isActive: true
   });
 
-  // Session timeout monitoring
+  // Session timeout monitoring with proper cleanup
   useEffect(() => {
-    if (!isAuthenticated) return;
-
-    let timeoutId;
-    let warningId;
-
-    const resetTimer = () => {
-      clearTimeout(timeoutId);
-      clearTimeout(warningId);
-      
-      setSessionInfo(prev => ({
-        ...prev,
-        lastActivity: Date.now(),
-        warningShown: false,
-        isActive: true
-      }));
-
-      // Set warning timer (5 minutes before timeout)
-      warningId = setTimeout(() => {
-        setSessionInfo(prev => ({ ...prev, warningShown: true }));
-      }, securitySettings.sessionTimeout - 5 * 60 * 1000);
-
-      // Set timeout timer
-      timeoutId = setTimeout(() => {
-        handleSessionTimeout();
-      }, securitySettings.sessionTimeout);
-    };
-
-    const handleActivity = () => {
-      if (sessionInfo.isActive) {
-        resetTimer();
-      }
-    };
+    if (!isAuthenticated) {
+      // Clear any existing timeouts
+      if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+      return;
+    }
 
     const handleSessionTimeout = () => {
+      isActiveRef.current = false;
       setSessionInfo(prev => ({ ...prev, isActive: false }));
       // Force logout
       localStorage.removeItem('authToken');
@@ -80,25 +61,62 @@ export const SecurityProvider = ({ children }) => {
       window.location.reload();
     };
 
+    const resetTimer = () => {
+      // Clear existing timeouts
+      if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+      
+      const now = Date.now();
+      lastActivityRef.current = now;
+      
+      // Only update state if values actually changed
+      setSessionInfo(prev => {
+        if (prev.lastActivity !== now || prev.warningShown || !prev.isActive) {
+          return {
+            lastActivity: now,
+            warningShown: false,
+            isActive: true
+          };
+        }
+        return prev;
+      });
+
+      // Set warning timer (5 minutes before timeout)
+      warningTimeoutRef.current = setTimeout(() => {
+        setSessionInfo(prev => ({ ...prev, warningShown: true }));
+      }, securitySettings.sessionTimeout - 5 * 60 * 1000);
+
+      // Set timeout timer
+      sessionTimeoutRef.current = setTimeout(handleSessionTimeout, securitySettings.sessionTimeout);
+    };
+
+    const handleActivity = useCallback(() => {
+      if (isActiveRef.current) {
+        resetTimer();
+      }
+    }, []);
+
     // Activity listeners
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
     events.forEach(event => {
       document.addEventListener(event, handleActivity, true);
     });
 
+    // Initialize timer
     resetTimer();
 
     return () => {
-      clearTimeout(timeoutId);
-      clearTimeout(warningId);
+      // Cleanup
+      if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
       events.forEach(event => {
         document.removeEventListener(event, handleActivity, true);
       });
     };
-  }, [isAuthenticated, securitySettings.sessionTimeout, sessionInfo.isActive]);
+  }, [isAuthenticated, securitySettings.sessionTimeout]); // Remove sessionInfo.isActive from dependencies
 
   // Password strength validation
-  const validatePassword = (password) => {
+  const validatePassword = useCallback((password) => {
     const { passwordPolicy } = securitySettings;
     const errors = [];
 
@@ -127,9 +145,9 @@ export const SecurityProvider = ({ children }) => {
       errors,
       strength: calculatePasswordStrength(password)
     };
-  };
+  }, [securitySettings]);
 
-  const calculatePasswordStrength = (password) => {
+  const calculatePasswordStrength = useCallback((password) => {
     let score = 0;
     
     // Length
@@ -151,10 +169,10 @@ export const SecurityProvider = ({ children }) => {
     if (score <= 6) return 'medium';
     if (score <= 8) return 'strong';
     return 'very_strong';
-  };
+  }, []);
 
   // Data encryption/decryption
-  const encryptSensitiveData = (data) => {
+  const encryptSensitiveData = useCallback((data) => {
     if (!securitySettings.encryptionEnabled) return data;
     
     try {
@@ -164,9 +182,9 @@ export const SecurityProvider = ({ children }) => {
       console.error('Encryption error:', error);
       return data;
     }
-  };
+  }, [securitySettings.encryptionEnabled]);
 
-  const decryptSensitiveData = (encryptedData) => {
+  const decryptSensitiveData = useCallback((encryptedData) => {
     if (!securitySettings.encryptionEnabled) return encryptedData;
     
     try {
@@ -175,14 +193,15 @@ export const SecurityProvider = ({ children }) => {
       console.error('Decryption error:', error);
       return encryptedData;
     }
-  };
+  }, [securitySettings.encryptionEnabled]);
 
   // Secure API request wrapper
-  const secureApiRequest = async (apiCall) => {
+  const secureApiRequest = useCallback(async (apiCall) => {
     try {
       const response = await apiCall();
       
       // Update last activity
+      lastActivityRef.current = Date.now();
       setSessionInfo(prev => ({ ...prev, lastActivity: Date.now() }));
       
       return response;
@@ -196,10 +215,10 @@ export const SecurityProvider = ({ children }) => {
       }
       throw error;
     }
-  };
+  }, []);
 
   // Audit logging
-  const logSecurityEvent = (eventType, details = {}) => {
+  const logSecurityEvent = useCallback((eventType, details = {}) => {
     const securityEvent = {
       timestamp: new Date().toISOString(),
       user: user?.username,
@@ -216,10 +235,10 @@ export const SecurityProvider = ({ children }) => {
     const events = JSON.parse(localStorage.getItem('securityEvents') || '[]');
     events.push(securityEvent);
     localStorage.setItem('securityEvents', JSON.stringify(events.slice(-100))); // Keep last 100
-  };
+  }, [user]);
 
   // Check for suspicious activity
-  const checkSuspiciousActivity = () => {
+  const checkSuspiciousActivity = useCallback(() => {
     const events = JSON.parse(localStorage.getItem('securityEvents') || '[]');
     const recentEvents = events.filter(event => 
       Date.now() - new Date(event.timestamp).getTime() < 60 * 60 * 1000 // Last hour
@@ -248,16 +267,23 @@ export const SecurityProvider = ({ children }) => {
     }
 
     return { suspicious: false };
-  };
+  }, [securitySettings.loginAttempts.maxAttempts]);
 
-  const extendSession = () => {
-    setSessionInfo(prev => ({
-      ...prev,
-      lastActivity: Date.now(),
+  const extendSession = useCallback(() => {
+    const now = Date.now();
+    lastActivityRef.current = now;
+    isActiveRef.current = true;
+    setSessionInfo({
+      lastActivity: now,
       warningShown: false,
       isActive: true
-    }));
-  };
+    });
+  }, []);
+
+  const timeUntilTimeout = useCallback(() => {
+    const elapsed = Date.now() - lastActivityRef.current;
+    return Math.max(0, securitySettings.sessionTimeout - elapsed);
+  }, [securitySettings.sessionTimeout]);
 
   const value = {
     securitySettings,
@@ -269,10 +295,7 @@ export const SecurityProvider = ({ children }) => {
     logSecurityEvent,
     checkSuspiciousActivity,
     extendSession,
-    timeUntilTimeout: () => {
-      const elapsed = Date.now() - sessionInfo.lastActivity;
-      return Math.max(0, securitySettings.sessionTimeout - elapsed);
-    }
+    timeUntilTimeout
   };
 
   return (
