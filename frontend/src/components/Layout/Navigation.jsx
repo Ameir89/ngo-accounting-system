@@ -1,4 +1,4 @@
-// frontend/src/components/Layout/EnhancedNavigation.jsx
+// frontend/src/components/Layout/EnhancedNavigation.jsx - Optimized Version
 import {
   Activity,
   BarChart3,
@@ -21,15 +21,254 @@ import {
   Users,
   Wallet
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
 
+// Memoized Navigation Item to prevent unnecessary re-renders
+const NavigationItem = memo(({ item, sectionColor, onItemClick, isActive }) => {
+  const { isRTL } = useLanguage();
+  const colorClasses = getColorClasses(sectionColor, isActive);
+  const ItemIcon = item.icon;
+
+  return (
+    <NavLink
+      to={item.href}
+      onClick={onItemClick}
+      className={({ isActive }) => `
+        group flex items-center justify-between px-3 py-2.5 text-sm rounded-lg 
+        transition-all duration-200 hover:scale-[1.02] hover:shadow-sm focus:outline-none
+        focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800
+        ${isActive 
+          ? `${colorClasses.bg} ${colorClasses.text} shadow-sm border ${colorClasses.border}` 
+          : `hover:bg-gray-50 dark:hover:bg-gray-700/50 ${colorClasses.text}`
+        }
+      `}
+      aria-label={`Navigate to ${item.name}`}
+    >
+      <div className="flex items-center space-x-3 min-w-0 flex-1">
+        <ItemIcon 
+          className={`h-4 w-4 flex-shrink-0 ${colorClasses.icon}`} 
+          aria-hidden="true"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium truncate">{item.name}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+            {item.description}
+          </div>
+        </div>
+      </div>
+      
+      {item.badge && (
+        <span className={`
+          inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+          ${item.badge === 'Hot' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
+            item.badge === 'New' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
+            'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+          }
+        `}>
+          {item.badge}
+        </span>
+      )}
+    </NavLink>
+  );
+});
+
+NavigationItem.displayName = 'NavigationItem';
+
+// Memoized Navigation Section
+const NavigationSection = memo(({ section, expandedSections, toggleSection, onItemClick }) => {
+  const { hasPermission } = useAuth();
+  
+  const visibleItems = useMemo(() => 
+    section.items?.filter(item => hasPermission(item.permission)) || [],
+    [section.items, hasPermission]
+  );
+
+  if (visibleItems.length === 0) return null;
+
+  const isExpanded = expandedSections[section.id];
+  const isActive = isParentActive(visibleItems);
+  const colorClasses = getColorClasses(section.color, isActive);
+  const SectionIcon = section.icon;
+
+  return (
+    <div className={`mb-2 ${section.id === 'overview' ? 'mb-6' : ''}`}>
+      {section.id !== 'overview' && (
+        <button
+          onClick={() => toggleSection(section.id)}
+          className={`
+            w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg 
+            transition-all duration-200 group hover:bg-gray-50 dark:hover:bg-gray-700/50
+            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 
+            dark:focus:ring-offset-gray-800 ${colorClasses.bg} ${colorClasses.text}
+          `}
+          aria-expanded={isExpanded}
+          aria-controls={`section-${section.id}`}
+        >
+          <div className="flex items-center space-x-3">
+            <SectionIcon className={`h-5 w-5 ${colorClasses.icon}`} aria-hidden="true" />
+            <span className="font-semibold">{section.title}</span>
+          </div>
+          <ChevronDown
+            className={`h-4 w-4 transform transition-transform duration-200 ${
+              isExpanded ? 'rotate-180' : ''
+            } ${colorClasses.icon}`}
+            aria-hidden="true"
+          />
+        </button>
+      )}
+      
+      {(isExpanded || section.id === 'overview') && (
+        <div 
+          id={`section-${section.id}`}
+          className={`space-y-1 ${section.id !== 'overview' ? 'mt-2 ml-2' : ''}`}
+        >
+          {visibleItems.map((item) => (
+            <NavigationItem 
+              key={item.href} 
+              item={item} 
+              sectionColor={section.color}
+              onItemClick={onItemClick}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+NavigationSection.displayName = 'NavigationSection';
+
+// Enhanced Search Results with keyboard navigation
+const SearchResults = memo(({ searchQuery, filteredItems, onItemClick, onClearSearch }) => {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const resultsRef = useRef(null);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [filteredItems]);
+
+  const handleKeyDown = useCallback((e) => {
+    if (!filteredItems.length) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.max(prev - 1, 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredItems[selectedIndex]) {
+          onItemClick(filteredItems[selectedIndex]);
+          onClearSearch();
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        onClearSearch();
+        break;
+    }
+  }, [filteredItems, selectedIndex, onItemClick, onClearSearch]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  if (!searchQuery.trim() || filteredItems.length === 0) return null;
+
+  return (
+    <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+        Search Results ({filteredItems.length})
+      </div>
+      <div ref={resultsRef} className="space-y-1 max-h-48 overflow-y-auto">
+        {filteredItems.slice(0, 5).map((item, index) => (
+          <NavLink
+            key={item.href}
+            to={item.href}
+            onClick={() => {
+              onItemClick();
+              onClearSearch();
+            }}
+            className={`block px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-600 
+              transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500
+              ${index === selectedIndex ? 'bg-gray-100 dark:bg-gray-600' : ''}
+            `}
+          >
+            <div className="font-medium text-gray-900 dark:text-gray-100">
+              {item.name}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              in {item.section}
+            </div>
+          </NavLink>
+        ))}
+      </div>
+      {filteredItems.length > 5 && (
+        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+          and {filteredItems.length - 5} more results...
+        </div>
+      )}
+    </div>
+  );
+});
+
+SearchResults.displayName = 'SearchResults';
+
+// Helper functions
+const getColorClasses = (color, isActive = false) => {
+  const colors = {
+    blue: {
+      bg: isActive ? 'bg-blue-50 dark:bg-blue-900/20' : '',
+      text: isActive ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400',
+      icon: isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400',
+      border: isActive ? 'border-blue-200 dark:border-blue-700' : '',
+    },
+    green: {
+      bg: isActive ? 'bg-green-50 dark:bg-green-900/20' : '',
+      text: isActive ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400',
+      icon: isActive ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400',
+      border: isActive ? 'border-green-200 dark:border-green-700' : '',
+    },
+    purple: {
+      bg: isActive ? 'bg-purple-50 dark:bg-purple-900/20' : '',
+      text: isActive ? 'text-purple-700 dark:text-purple-300' : 'text-gray-600 dark:text-gray-400',
+      icon: isActive ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400',
+      border: isActive ? 'border-purple-200 dark:border-purple-700' : '',
+    },
+    gray: {
+      bg: isActive ? 'bg-gray-50 dark:bg-gray-700' : '',
+      text: isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400',
+      icon: isActive ? 'text-gray-700 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400',
+      border: isActive ? 'border-gray-200 dark:border-gray-600' : '',
+    },
+  };
+  return colors[color] || colors.gray;
+};
+
+const isParentActive = (items) => {
+  const location = useLocation();
+  return items?.some(item => {
+    if (item.href === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(item.href);
+  });
+};
+
+// Main Navigation Component
 const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
   const location = useLocation();
   const { t, isRTL } = useLanguage();
   const { hasPermission } = useAuth();
+  
   const [expandedSections, setExpandedSections] = useState({
     generalLedger: true,
     finance: false,
@@ -40,7 +279,8 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
   const [filteredItems, setFilteredItems] = useState([]);
   const searchRef = useRef(null);
 
-  const navigationSections = [
+  // Navigation configuration
+  const navigationSections = useMemo(() => [
     {
       id: 'overview',
       title: t('Overview'),
@@ -200,65 +440,26 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
         },
       ],
     },
-  ];
+  ], [t]);
 
-  const toggleSection = (sectionId) => {
+  const toggleSection = useCallback((sectionId) => {
     setExpandedSections(prev => ({
       ...prev,
       [sectionId]: !prev[sectionId]
     }));
-  };
+  }, []);
 
-  const isCurrentPath = (href) => {
-    if (href === '/') {
-      return location.pathname === '/';
-    }
-    return location.pathname.startsWith(href);
-  };
-
-  const isParentActive = (items) => {
-    return items?.some(item => isCurrentPath(item.href));
-  };
-
-  const getColorClasses = (color, isActive = false) => {
-    const colors = {
-      blue: {
-        bg: isActive ? 'bg-blue-50 dark:bg-blue-900/20' : '',
-        text: isActive ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400',
-        icon: isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400',
-        border: isActive ? 'border-blue-200 dark:border-blue-700' : '',
-      },
-      green: {
-        bg: isActive ? 'bg-green-50 dark:bg-green-900/20' : '',
-        text: isActive ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400',
-        icon: isActive ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400',
-        border: isActive ? 'border-green-200 dark:border-green-700' : '',
-      },
-      purple: {
-        bg: isActive ? 'bg-purple-50 dark:bg-purple-900/20' : '',
-        text: isActive ? 'text-purple-700 dark:text-purple-300' : 'text-gray-600 dark:text-gray-400',
-        icon: isActive ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400',
-        border: isActive ? 'border-purple-200 dark:border-purple-700' : '',
-      },
-      gray: {
-        bg: isActive ? 'bg-gray-50 dark:bg-gray-700' : '',
-        text: isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400',
-        icon: isActive ? 'text-gray-700 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400',
-        border: isActive ? 'border-gray-200 dark:border-gray-600' : '',
-      },
-    };
-    return colors[color] || colors.gray;
-  };
-
-  // Search functionality
+  // Search functionality with debouncing
   useEffect(() => {
     if (searchQuery.trim()) {
       const filtered = [];
       navigationSections.forEach(section => {
         section.items.forEach(item => {
           if (
-            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.description.toLowerCase().includes(searchQuery.toLowerCase())
+            hasPermission(item.permission) && (
+              item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              item.description.toLowerCase().includes(searchQuery.toLowerCase())
+            )
           ) {
             filtered.push({ ...item, section: section.title });
           }
@@ -268,145 +469,20 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
     } else {
       setFilteredItems([]);
     }
-  }, [searchQuery, navigationSections]);
+  }, [searchQuery, navigationSections, hasPermission]);
 
-  const NavigationSection = ({ section }) => {
-    if (!section.items?.some(item => hasPermission(item.permission))) {
-      return null;
-    }
-
-    const isExpanded = expandedSections[section.id];
-    const isActive = isParentActive(section.items);
-    const colorClasses = getColorClasses(section.color, isActive);
-    const SectionIcon = section.icon;
-
-    return (
-      <div className={`mb-2 ${section.id === 'overview' ? 'mb-6' : ''}`}>
-        {section.id !== 'overview' && (
-          <button
-            onClick={() => toggleSection(section.id)}
-            className={`
-              w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg 
-              transition-all duration-200 group hover:bg-gray-50 dark:hover:bg-gray-700/50
-              ${colorClasses.bg} ${colorClasses.text}
-            `}
-          >
-            <div className="flex items-center space-x-3">
-              <SectionIcon className={`h-5 w-5 ${colorClasses.icon}`} />
-              <span className="font-semibold">{section.title}</span>
-            </div>
-            <ChevronDown
-              className={`h-4 w-4 transform transition-transform duration-200 ${
-                isExpanded ? 'rotate-180' : ''
-              } ${colorClasses.icon}`}
-            />
-          </button>
-        )}
-        
-        {(isExpanded || section.id === 'overview') && (
-          <div className={`space-y-1 ${section.id !== 'overview' ? 'mt-2 ml-2' : ''}`}>
-            {section.items.map((item) => (
-              <NavigationItem 
-                key={item.href} 
-                item={item} 
-                sectionColor={section.color}
-                onItemClick={onItemClick}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const NavigationItem = ({ item, sectionColor, onItemClick }) => {
-    if (!hasPermission(item.permission)) {
-      return null;
-    }
-
-    const isActive = isCurrentPath(item.href);
-    const colorClasses = getColorClasses(sectionColor, isActive);
-    const ItemIcon = item.icon;
-
-    return (
-      <NavLink
-        to={item.href}
-        onClick={onItemClick}
-        className={({ isActive }) => `
-          group flex items-center justify-between px-3 py-2.5 text-sm rounded-lg 
-          transition-all duration-200 hover:scale-[1.02] hover:shadow-sm
-          ${isActive 
-            ? `${colorClasses.bg} ${colorClasses.text} shadow-sm border ${colorClasses.border}` 
-            : `hover:bg-gray-50 dark:hover:bg-gray-700/50 ${colorClasses.text}`
-          }
-        `}
-      >
-        <div className="flex items-center space-x-3 min-w-0 flex-1">
-          <ItemIcon className={`h-4 w-4 flex-shrink-0 ${colorClasses.icon}`} />
-          <div className="min-w-0 flex-1">
-            <div className="font-medium truncate">{item.name}</div>
-            {!isMobile && (
-              <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                {item.description}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {item.badge && (
-          <span className={`
-            inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-            ${item.badge === 'Hot' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
-              item.badge === 'New' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
-              'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-            }
-          `}>
-            {item.badge}
-          </span>
-        )}
-      </NavLink>
-    );
-  };
-
-  const SearchResults = () => {
-    if (!searchQuery.trim() || filteredItems.length === 0) return null;
-
-    return (
-      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-          Search Results
-        </div>
-        <div className="space-y-1">
-          {filteredItems.slice(0, 5).map((item) => (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              onClick={() => {
-                setSearchQuery('');
-                onItemClick?.();
-              }}
-              className="block px-2 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-600"
-            >
-              <div className="font-medium text-gray-900 dark:text-gray-100">
-                {item.name}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                in {item.section}
-              </div>
-            </NavLink>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setFilteredItems([]);
+  }, []);
 
   return (
-    <nav className="space-y-1 px-3 py-4">
-      {/* Search Bar */}
+    <nav className="space-y-1 px-3 py-4" role="navigation" aria-label="Main navigation">
+      {/* Enhanced Search Bar */}
       <div className="mb-6">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
+            <Search className="h-4 w-4 text-gray-400" aria-hidden="true" />
           </div>
           <input
             ref={searchRef}
@@ -416,29 +492,46 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="
               block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-600 
-              rounded-lg bg-white dark:bg-gray-700 text-sm
+              rounded-lg bg-white dark:bg-gray-700 text-sm transition-colors duration-200
               focus:ring-2 focus:ring-blue-500 focus:border-transparent
               dark:text-white placeholder-gray-400 dark:placeholder-gray-500
             "
+            aria-label="Search navigation items"
           />
         </div>
-        <SearchResults />
+        <SearchResults 
+          searchQuery={searchQuery}
+          filteredItems={filteredItems}
+          onItemClick={onItemClick}
+          onClearSearch={clearSearch}
+        />
       </div>
 
       {/* Navigation Sections */}
       <div className="space-y-1">
         {navigationSections.map((section) => (
-          <NavigationSection key={section.id} section={section} />
+          <NavigationSection 
+            key={section.id} 
+            section={section}
+            expandedSections={expandedSections}
+            toggleSection={toggleSection}
+            onItemClick={onItemClick}
+          />
         ))}
       </div>
 
       {/* Quick Help */}
       <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
-        <button className="
-          w-full flex items-center space-x-3 px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400
-          rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200
-        ">
-          <HelpCircle className="h-4 w-4" />
+        <button 
+          className="
+            w-full flex items-center space-x-3 px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400
+            rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200
+            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 
+            dark:focus:ring-offset-gray-800
+          "
+          aria-label="Help and support"
+        >
+          <HelpCircle className="h-4 w-4" aria-hidden="true" />
           <span>Help & Support</span>
         </button>
       </div>
@@ -446,4 +539,4 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
   );
 };
 
-export default EnhancedNavigation;
+export default memo(EnhancedNavigation);
