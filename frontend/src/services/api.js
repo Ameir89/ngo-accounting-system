@@ -1,84 +1,134 @@
-// frontend/src/services/api.js - Enhanced with Auto Token Refresh
+// frontend/src/services/api.js - Enhanced Token Refresh Implementation
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
 // -----------------------------
-// Token Management Utilities
+// Enhanced Token Management
 // -----------------------------
-const TOKEN_STORAGE_KEYS = {
-  ACCESS_TOKEN: 'authToken',
-  REFRESH_TOKEN: 'refreshToken',
-  TOKEN_EXPIRY: 'tokenExpiry',
-};
-
 class TokenManager {
   constructor() {
     this.refreshPromise = null;
     this.isRefreshing = false;
     this.failedQueue = [];
+    this.tokenRefreshBuffer = 5 * 60 * 1000; // 5 minutes buffer before expiry
+  }
+
+  // Storage keys
+  get STORAGE_KEYS() {
+    return {
+      ACCESS_TOKEN: 'authToken',
+      REFRESH_TOKEN: 'refreshToken',
+      TOKEN_EXPIRY: 'tokenExpiry',
+      USER: 'user'
+    };
   }
 
   // Get tokens from storage
   getAccessToken() {
-    return localStorage.getItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN);
+    return localStorage.getItem(this.STORAGE_KEYS.ACCESS_TOKEN);
   }
 
   getRefreshToken() {
-    return localStorage.getItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN);
+    return localStorage.getItem(this.STORAGE_KEYS.REFRESH_TOKEN);
   }
 
   getTokenExpiry() {
-    const expiry = localStorage.getItem(TOKEN_STORAGE_KEYS.TOKEN_EXPIRY);
-    return expiry ? parseInt(expiry) : null;
+    const expiry = localStorage.getItem(this.STORAGE_KEYS.TOKEN_EXPIRY);
+    return expiry ? parseInt(expiry, 10) : null;
   }
 
-  // Set tokens in storage
+  // Set tokens with automatic expiry calculation
   setTokens(accessToken, refreshToken = null, expiresIn = null) {
-    localStorage.setItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+    if (!accessToken) {
+      console.error('❌ Cannot set empty access token');
+      return false;
+    }
+
+    localStorage.setItem(this.STORAGE_KEYS.ACCESS_TOKEN, accessToken);
     
     if (refreshToken) {
-      localStorage.setItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+      localStorage.setItem(this.STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
     }
     
     if (expiresIn) {
-      // Calculate expiry time (current time + expires_in - 5 minute buffer)
-      const expiryTime = Date.now() + (expiresIn * 1000) - (5 * 60 * 1000);
-      localStorage.setItem(TOKEN_STORAGE_KEYS.TOKEN_EXPIRY, expiryTime.toString());
+      // Calculate expiry time with buffer
+      const expiryTime = Date.now() + (expiresIn * 1000) - this.tokenRefreshBuffer;
+      localStorage.setItem(this.STORAGE_KEYS.TOKEN_EXPIRY, expiryTime.toString());
     }
+
+    console.log('✅ Tokens stored successfully');
+    return true;
   }
 
-  // Clear all tokens
+  // Clear all tokens and user data
   clearTokens() {
-    localStorage.removeItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN);
-    localStorage.removeItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(TOKEN_STORAGE_KEYS.TOKEN_EXPIRY);
-    localStorage.removeItem('user');
+    const keys = Object.values(this.STORAGE_KEYS);
+    keys.forEach(key => localStorage.removeItem(key));
+    
+    // Clear additional auth-related items
+    localStorage.removeItem('securityEvents');
+    
+    console.log('🧹 All tokens cleared');
   }
 
-  // Check if access token is expired or expiring soon
-  isTokenExpired() {
+  // Check if token needs refresh (expired or expiring soon)
+  shouldRefreshToken() {
+    const accessToken = this.getAccessToken();
+    const refreshToken = this.getRefreshToken();
     const expiry = this.getTokenExpiry();
-    if (!expiry) return false;
     
+    // No tokens available
+    if (!accessToken || !refreshToken) {
+      return false;
+    }
+
+    // No expiry info, assume token is still valid
+    if (!expiry) {
+      return false;
+    }
+
+    // Check if token is expired or expiring soon
     return Date.now() >= expiry;
   }
 
-  // Process the refresh queue
-  processQueue(error, token = null) {
-    this.failedQueue.forEach((prom) => {
+  // Validate token format (basic JWT structure check)
+  isValidTokenFormat(token) {
+    if (!token || typeof token !== 'string') return false;
+    
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    
+    try {
+      // Try to decode the payload
+      const payload = JSON.parse(atob(parts[1]));
+      return payload && typeof payload === 'object';
+    } catch {
+      return false;
+    }
+  }
+
+  // Add request to refresh queue
+  addToRefreshQueue(resolve, reject) {
+    this.failedQueue.push({ resolve, reject });
+  }
+
+  // Process all queued requests
+  processRefreshQueue(error = null, token = null) {
+    this.failedQueue.forEach(({ resolve, reject }) => {
       if (error) {
-        prom.reject(error);
+        reject(error);
       } else {
-        prom.resolve(token);
+        resolve(token);
       }
     });
     
     this.failedQueue = [];
   }
 
-  // Add request to queue during refresh
-  addToQueue(resolve, reject) {
-    this.failedQueue.push({ resolve, reject });
+  // Reset refresh state
+  resetRefreshState() {
+    this.isRefreshing = false;
+    this.refreshPromise = null;
   }
 }
 
@@ -101,7 +151,7 @@ const API_CONFIG = {
 
 const config = API_CONFIG[process.env.NODE_ENV] || API_CONFIG.development;
 
-// Create Axios instance
+// Create main Axios instance
 const api = axios.create({
   ...config,
   withCredentials: false,
@@ -112,43 +162,125 @@ const api = axios.create({
 });
 
 // -----------------------------
+// Token Refresh Function
+// -----------------------------
+async function refreshTokens() {
+  const refreshToken = tokenManager.getRefreshToken();
+  
+  if (!refreshToken) {
+    throw new Error('No refresh token available');
+  }
+
+  console.log('🔄 Refreshing access token...');
+
+  try {
+    // Create separate axios instance to avoid interceptor loops
+    const refreshApi = axios.create({
+      baseURL: config.baseURL,
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const response = await refreshApi.post('/auth/refresh', {
+      refresh_token: refreshToken
+    });
+
+    const { 
+      access_token, 
+      refresh_token: newRefreshToken, 
+      expires_in 
+    } = response.data;
+
+    if (!access_token) {
+      throw new Error('Invalid refresh response: missing access token');
+    }
+
+    // Validate token format
+    if (!tokenManager.isValidTokenFormat(access_token)) {
+      throw new Error('Invalid access token format received');
+    }
+
+    // Store new tokens
+    const success = tokenManager.setTokens(access_token, newRefreshToken, expires_in);
+    if (!success) {
+      throw new Error('Failed to store new tokens');
+    }
+
+    // Log success
+    logSecurityEvent('TOKEN_REFRESHED', { 
+      timestamp: new Date().toISOString(),
+      hasNewRefreshToken: !!newRefreshToken
+    });
+
+    console.log('✅ Token refresh successful');
+    return access_token;
+
+  } catch (error) {
+    console.error('❌ Token refresh failed:', error);
+    
+    // Log failure
+    logSecurityEvent('TOKEN_REFRESH_FAILED', { 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+
+    // If refresh token is invalid/expired, clear everything
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      console.log('🚪 Refresh token invalid, clearing session');
+      tokenManager.clearTokens();
+    }
+
+    throw error;
+  }
+}
+
+// -----------------------------
 // Request Interceptor
 // -----------------------------
 api.interceptors.request.use(
   async (config) => {
-    // Add access token to requests
     const accessToken = tokenManager.getAccessToken();
+    
+    // Add access token to request headers
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
-    // Check if token is expired and refresh proactively
-    if (accessToken && tokenManager.isTokenExpired() && !tokenManager.isRefreshing) {
+    // Proactive token refresh (optional enhancement)
+    if (accessToken && tokenManager.shouldRefreshToken() && !tokenManager.isRefreshing) {
       try {
-        console.log('🔄 Token is expiring soon, refreshing proactively...');
-        await refreshAccessToken();
+        console.log('🔄 Token expiring soon, refreshing proactively...');
         
-        // Update the request with new token
-        const newToken = tokenManager.getAccessToken();
-        if (newToken) {
-          config.headers.Authorization = `Bearer ${newToken}`;
-        }
+        // Don't await this to avoid blocking the request
+        // The response interceptor will handle any 401s if this fails
+        refreshTokens()
+          .then(newToken => {
+            if (newToken && config.headers) {
+              config.headers.Authorization = `Bearer ${newToken}`;
+            }
+          })
+          .catch(error => {
+            console.warn('⚠️ Proactive refresh failed:', error.message);
+          });
+          
       } catch (error) {
-        console.warn('⚠️ Proactive token refresh failed, proceeding with current token');
+        console.warn('⚠️ Proactive refresh error:', error.message);
       }
     }
 
     // Add request metadata for debugging
     config.metadata = { 
-      requestId: Date.now().toString(),
+      requestId: Math.random().toString(36).substr(2, 9),
       startTime: Date.now()
     };
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('🚀 API Request:', {
-        url: `${config.baseURL}${config.url}`,
-        method: config.method.toUpperCase(),
-        headers: { ...config.headers, Authorization: config.headers.Authorization ? '[HIDDEN]' : undefined },
+      console.log(`🚀 API Request [${config.metadata.requestId}]:`, {
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        hasAuth: !!config.headers.Authorization
       });
     }
 
@@ -161,17 +293,17 @@ api.interceptors.request.use(
 );
 
 // -----------------------------
-// Response Interceptor with Token Refresh Logic
+// Response Interceptor with Enhanced Token Refresh
 // -----------------------------
 api.interceptors.response.use(
   (response) => {
     // Log successful responses in development
     if (process.env.NODE_ENV === 'development') {
-      const duration = Date.now() - response.config.metadata?.startTime;
-      console.log('✅ API Response:', {
-        url: response.config.url,
+      const requestId = response.config.metadata?.requestId;
+      const duration = Date.now() - (response.config.metadata?.startTime || 0);
+      console.log(`✅ API Response [${requestId}]:`, {
         status: response.status,
-        duration: `${duration}ms`,
+        duration: `${duration}ms`
       });
     }
     return response;
@@ -186,150 +318,122 @@ api.interceptors.response.use(
       return Promise.reject(new Error('Network error'));
     }
 
-    const { status, data } = error.response;
+    const { status } = error.response;
 
     // -----------------------------
-    // Handle 401 Unauthorized with Token Refresh
+    // Enhanced 401 Handling with Token Refresh
     // -----------------------------
-    if (status === 401 && !originalRequest._retry) {
+    if (status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
+
+      const refreshToken = tokenManager.getRefreshToken();
+      
+      // No refresh token available
+      if (!refreshToken) {
+        console.log('🚪 No refresh token, redirecting to login');
+        handleAuthFailure('no_refresh_token');
+        return Promise.reject(error);
+      }
 
       // If already refreshing, queue this request
       if (tokenManager.isRefreshing) {
+        console.log('🔄 Already refreshing, queuing request...');
+        
         return new Promise((resolve, reject) => {
-          tokenManager.addToQueue(
-            (token) => {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              resolve(api(originalRequest));
+          tokenManager.addToRefreshQueue(
+            async (newToken) => {
+              if (newToken && originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              }
+              try {
+                const response = await api(originalRequest);
+                resolve(response);
+              } catch (retryError) {
+                reject(retryError);
+              }
             },
-            (err) => reject(err)
+            (refreshError) => reject(refreshError)
           );
         });
       }
 
       // Start refresh process
+      console.log('🔄 Starting token refresh process...');
       tokenManager.isRefreshing = true;
 
       try {
-        console.log('🔄 Access token expired, attempting refresh...');
-        const newAccessToken = await refreshAccessToken();
+        const newAccessToken = await refreshTokens();
         
         if (newAccessToken) {
-          // Update the failed request with new token
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          // Update the original request with new token
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          }
           
           // Process queued requests
-          tokenManager.processQueue(null, newAccessToken);
+          tokenManager.processRefreshQueue(null, newAccessToken);
+          
+          // Reset refresh state
+          tokenManager.resetRefreshState();
           
           // Retry the original request
+          console.log('🔁 Retrying original request with new token');
           return api(originalRequest);
         } else {
-          throw new Error('No access token received');
+          throw new Error('Token refresh succeeded but no token received');
         }
+
       } catch (refreshError) {
-        console.error('❌ Token refresh failed:', refreshError);
+        console.error('❌ Token refresh process failed:', refreshError);
         
-        // Process queue with error
-        tokenManager.processQueue(refreshError, null);
+        // Process queued requests with error
+        tokenManager.processRefreshQueue(refreshError);
         
-        // Clear tokens and redirect to login
+        // Reset refresh state
+        tokenManager.resetRefreshState();
+        
+        // Handle auth failure
         handleAuthFailure('token_refresh_failed');
         
         return Promise.reject(refreshError);
-      } finally {
-        tokenManager.isRefreshing = false;
       }
     }
 
     // -----------------------------
-    // Handle other status codes
+    // Handle Other Error Status Codes
     // -----------------------------
-    handleApiError(status, data);
+    handleApiError(status, error.response.data, error);
     return Promise.reject(error);
   }
 );
 
 // -----------------------------
-// Token Refresh Function
-// -----------------------------
-async function refreshAccessToken() {
-  const refreshToken = tokenManager.getRefreshToken();
-  
-  if (!refreshToken) {
-    throw new Error('No refresh token available');
-  }
-
-  try {
-    // Create a new axios instance to avoid infinite loops
-    const refreshApi = axios.create({
-      baseURL: config.baseURL,
-      timeout: 10000,
-    });
-
-    const response = await refreshApi.post('/auth/refresh', {
-      refresh_token: refreshToken
-    });
-
-    const { access_token, refresh_token: newRefreshToken, expires_in } = response.data;
-
-    if (!access_token) {
-      throw new Error('Invalid refresh response: no access token');
-    }
-
-    // Store new tokens
-    tokenManager.setTokens(access_token, newRefreshToken, expires_in);
-    
-    console.log('✅ Token refreshed successfully');
-    
-    // Log security event
-    logSecurityEvent('TOKEN_REFRESHED', { timestamp: new Date().toISOString() });
-    
-    return access_token;
-  } catch (error) {
-    console.error('❌ Refresh token request failed:', error);
-    
-    // Log security event
-    logSecurityEvent('TOKEN_REFRESH_FAILED', { 
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-    
-    throw error;
-  }
-}
-
-// -----------------------------
 // Error Handling Functions
 // -----------------------------
-function handleApiError(status, data) {
-  let message = data?.message || 'An error occurred';
+function handleApiError(status, data, originalError) {
+  const message = data?.message || 'An error occurred';
 
   switch (status) {
     case 400:
       toast.error(message || 'Invalid request data');
       break;
     case 403:
-      toast.error(message || 'You do not have permission');
+      toast.error(message || 'You do not have permission to perform this action');
       break;
     case 404:
       toast.error(message || 'Resource not found');
       break;
     case 422:
-      if (data?.errors && typeof data.errors === 'object') {
-        // Handle validation errors
-        Object.values(data.errors).flat().forEach((msg) => toast.error(msg));
-      } else {
-        toast.error(message || 'Validation failed');
-      }
+      handleValidationErrors(data);
       break;
     case 429:
       toast.error('Too many requests. Please try again later.');
       break;
     case 500:
-      toast.error(message || 'Internal server error');
+      toast.error(message || 'Internal server error. Please try again later.');
       break;
     case 503:
-      toast.error('Service temporarily unavailable');
+      toast.error('Service temporarily unavailable. Please try again later.');
       break;
     default:
       if (status >= 500) {
@@ -337,6 +441,29 @@ function handleApiError(status, data) {
       } else if (status >= 400) {
         toast.error(message);
       }
+  }
+
+  // Log error for debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.error(`❌ API Error [${status}]:`, {
+      message,
+      url: originalError?.config?.url,
+      method: originalError?.config?.method?.toUpperCase()
+    });
+  }
+}
+
+function handleValidationErrors(data) {
+  if (data?.errors && typeof data.errors === 'object') {
+    // Handle field-specific validation errors
+    Object.entries(data.errors).forEach(([field, messages]) => {
+      const errorMessages = Array.isArray(messages) ? messages : [messages];
+      errorMessages.forEach(msg => {
+        toast.error(`${field}: ${msg}`);
+      });
+    });
+  } else {
+    toast.error(data?.message || 'Validation failed');
   }
 }
 
@@ -352,13 +479,22 @@ function handleAuthFailure(reason) {
   // Clear all auth data
   tokenManager.clearTokens();
   
+  // Reset any refresh state
+  tokenManager.resetRefreshState();
+  
   // Show user-friendly message
-  toast.error('Session expired. Please login again.');
+  toast.error('Your session has expired. Please login again.');
   
   // Redirect to login after a short delay
   setTimeout(() => {
+    // Clear any remaining app state
+    window.dispatchEvent(new CustomEvent('auth:logout', { 
+      detail: { reason } 
+    }));
+    
+    // Redirect
     window.location.href = '/login';
-  }, 1000);
+  }, 1500);
 }
 
 function logSecurityEvent(eventType, details) {
@@ -367,7 +503,7 @@ function logSecurityEvent(eventType, details) {
     events.push({
       eventType,
       ...details,
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent.substring(0, 100) // Truncate for storage
     });
     
     // Keep only last 100 events
@@ -378,7 +514,7 @@ function logSecurityEvent(eventType, details) {
 }
 
 // -----------------------------
-// Enhanced API Service
+// API Service Endpoints
 // -----------------------------
 export const apiService = {
   // Auth endpoints
@@ -387,32 +523,41 @@ export const apiService = {
       const response = await api.post('/auth/login', credentials);
       const { access_token, refresh_token, expires_in, user } = response.data;
       
-      // Store tokens
-      tokenManager.setTokens(access_token, refresh_token, expires_in);
-      localStorage.setItem('user', JSON.stringify(user));
+      if (!access_token || !user) {
+        throw new Error('Invalid login response');
+      }
       
-      logSecurityEvent('LOGIN_SUCCESS', { username: credentials.username });
+      // Store tokens and user data
+      tokenManager.setTokens(access_token, refresh_token, expires_in);
+      localStorage.setItem(tokenManager.STORAGE_KEYS.USER, JSON.stringify(user));
+      
+      logSecurityEvent('LOGIN_SUCCESS', { 
+        username: credentials.username,
+        timestamp: new Date().toISOString()
+      });
       
       return { token: access_token, user };
     },
     
     logout: async () => {
       try {
+        // Call logout endpoint if possible
         await api.post('/auth/logout');
       } catch (error) {
         console.warn('Logout API call failed:', error);
       }
       
-      logSecurityEvent('LOGOUT', { reason: 'user_initiated' });
+      logSecurityEvent('LOGOUT', { 
+        reason: 'user_initiated',
+        timestamp: new Date().toISOString()
+      });
+      
       tokenManager.clearTokens();
     },
     
-    refreshToken: async () => {
-      return refreshAccessToken();
-    },
-    
+    refreshToken: () => refreshTokens(),
     getMe: () => api.get('/auth/me'),
-    changePassword: (passwordData) => api.put('/auth/change-password', passwordData),
+    changePassword: (data) => api.put('/auth/change-password', data),
     forgotPassword: (data) => api.post('/auth/forgot-password', data),
     resetPassword: (data) => api.post('/auth/reset-password', data),
   },
@@ -424,26 +569,9 @@ export const apiService = {
     getSummary: (params = {}) => api.get('/dashboard/summary', { params }),
     getRevenueChart: (params = {}) => api.get('/dashboard/charts/revenue-trend', { params }),
     getExpenseChart: (params = {}) => api.get('/dashboard/charts/expense-breakdown', { params }),
-    getComprehensiveData: async (params = {}) => {
-      const results = await Promise.allSettled([
-        api.get('/dashboard/overview', { params }),
-        api.get('/dashboard/financial-summary', { params }),
-        api.get('/dashboard/charts/revenue-trend', { params }),
-        api.get('/dashboard/charts/expense-breakdown', { params }),
-      ]);
-      
-      return {
-        overview: results[0].status === 'fulfilled' ? results[0].value.data : null,
-        financialSummary: results[1].status === 'fulfilled' ? results[1].value.data : null,
-        charts: {
-          revenue: results[2].status === 'fulfilled' ? results[2].value.data : null,
-          expenses: results[3].status === 'fulfilled' ? results[3].value.data : null,
-        },
-      };
-    },
   },
 
-  // Journal Entries
+  // Other endpoints... (keep existing ones)
   journalEntries: {
     getAll: (params = {}) => api.get('/journal-entries', { params }),
     getById: (id) => api.get(`/journal-entries/${id}`),
@@ -453,7 +581,6 @@ export const apiService = {
     post: (id) => api.post(`/journal-entries/${id}/post`),
   },
 
-  // Accounts
   accounts: {
     getAll: (params = {}) => api.get('/accounts', { params }),
     getById: (id) => api.get(`/accounts/${id}`),
@@ -463,7 +590,7 @@ export const apiService = {
     delete: (id) => api.delete(`/accounts/${id}`),
   },
 
-  // Suppliers
+  // Add other endpoints as needed...
   suppliers: {
     getAll: (params = {}) => api.get('/suppliers', { params }),
     getById: (id) => api.get(`/suppliers/${id}`),
@@ -472,7 +599,6 @@ export const apiService = {
     delete: (id) => api.delete(`/suppliers/${id}`),
   },
 
-  // Grants
   grants: {
     getAll: (params = {}) => api.get('/grants', { params }),
     getById: (id) => api.get(`/grants/${id}`),
@@ -482,7 +608,6 @@ export const apiService = {
     delete: (id) => api.delete(`/grants/${id}`),
   },
 
-  // Fixed Assets
   fixedAssets: {
     getAll: (params = {}) => api.get('/fixed-assets', { params }),
     getById: (id) => api.get(`/fixed-assets/${id}`),
@@ -491,7 +616,6 @@ export const apiService = {
     delete: (id) => api.delete(`/fixed-assets/${id}`),
   },
 
-  // Cost Centers & Projects
   costCenters: {
     getAll: (params = {}) => api.get('/cost-centers', { params }),
     getById: (id) => api.get(`/cost-centers/${id}`),
@@ -509,7 +633,6 @@ export const apiService = {
     delete: (id) => api.delete(`/projects/${id}`),
   },
 
-  // Budgets
   budgets: {
     getAll: (params = {}) => api.get('/budgets', { params }),
     getById: (id) => api.get(`/budgets/${id}`),
@@ -520,7 +643,6 @@ export const apiService = {
     delete: (id) => api.delete(`/budgets/${id}`),
   },
 
-  // Reports
   reports: {
     trialBalance: (params = {}) => api.get('/reports/trial-balance', { params }),
     balanceSheet: (params = {}) => api.get('/reports/balance-sheet', { params }),
@@ -528,33 +650,49 @@ export const apiService = {
     cashFlow: (params = {}) => api.get('/reports/cash-flow', { params }),
   },
 
-  // Health check
   health: {
     check: () => api.get('/health'),
   },
 };
 
 // -----------------------------
-// Utility Functions
+// Utility Functions & Exports
 // -----------------------------
 export const tokenUtils = {
   getAccessToken: () => tokenManager.getAccessToken(),
   getRefreshToken: () => tokenManager.getRefreshToken(),
-  isTokenExpired: () => tokenManager.isTokenExpired(),
+  shouldRefreshToken: () => tokenManager.shouldRefreshToken(),
   clearTokens: () => tokenManager.clearTokens(),
-  refreshToken: () => refreshAccessToken(),
+  refreshTokens: () => refreshTokens(),
+  isValidTokenFormat: (token) => tokenManager.isValidTokenFormat(token),
 };
 
-// Setup proactive token refresh (optional)
-export const setupProactiveRefresh = () => {
-  setInterval(() => {
-    if (tokenManager.isTokenExpired() && tokenManager.getRefreshToken()) {
-      console.log('🔄 Starting proactive token refresh...');
-      refreshAccessToken().catch(error => {
-        console.warn('⚠️ Proactive refresh failed:', error);
+// Setup periodic token check (optional)
+export const setupTokenMonitoring = (intervalMinutes = 1) => {
+  return setInterval(() => {
+    if (tokenManager.shouldRefreshToken() && !tokenManager.isRefreshing) {
+      console.log('🔄 Background token refresh triggered');
+      refreshTokens().catch(error => {
+        console.warn('⚠️ Background refresh failed:', error.message);
       });
     }
-  }, 60000); // Check every minute
+  }, intervalMinutes * 60 * 1000);
+};
+
+// Get token debug info
+export const getTokenDebugInfo = () => {
+  const accessToken = tokenManager.getAccessToken();
+  const refreshToken = tokenManager.getRefreshToken();
+  const expiry = tokenManager.getTokenExpiry();
+  
+  return {
+    hasAccessToken: !!accessToken,
+    hasRefreshToken: !!refreshToken,
+    tokenExpiry: expiry ? new Date(expiry).toISOString() : null,
+    shouldRefresh: tokenManager.shouldRefreshToken(),
+    isRefreshing: tokenManager.isRefreshing,
+    timeUntilExpiry: expiry ? Math.max(0, expiry - Date.now()) : null,
+  };
 };
 
 export default api;

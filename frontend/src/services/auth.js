@@ -1,97 +1,7 @@
-// frontend/src/services/auth.js - Enhanced with Token Refresh Support
+// frontend/src/services/auth.js - Enhanced Auth Service
 import { apiService, tokenUtils } from './api';
 
-// Auth service utilities
-const AUTH_STORAGE_KEYS = {
-  TOKEN: 'authToken',
-  REFRESH_TOKEN: 'refreshToken',
-  USER: 'user',
-  TOKEN_EXPIRY: 'tokenExpiry',
-};
-
-// Token validation utility
-const validateToken = (token) => {
-  if (!token) return false;
-
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return false;
-    
-    const payload = JSON.parse(atob(parts[1]));
-    const now = Date.now() / 1000;
-    
-    // Check if token is expired (with 5 minute buffer)
-    if (payload.exp && payload.exp < now + 300) {
-      console.warn('Token is expired or expiring soon');
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Token validation error:', error);
-    return false;
-  }
-};
-
-// Enhanced secure storage utilities
-const secureStorage = {
-  setItem: (key, value) => {
-    try {
-      const serializedValue = typeof value === 'string' ? value : JSON.stringify(value);
-      localStorage.setItem(key, serializedValue);
-      return true;
-    } catch (error) {
-      console.error(`Failed to store ${key}:`, error);
-      return false;
-    }
-  },
-
-  getItem: (key, defaultValue = null) => {
-    try {
-      const item = localStorage.getItem(key);
-      
-      if (!item) return defaultValue;
-      
-      // Try to parse as JSON, fall back to string
-      try {
-        return JSON.parse(item);
-      } catch {
-        return item;
-      }
-    } catch (error) {
-      console.error(`Failed to retrieve ${key}:`, error);
-      return defaultValue;
-    }
-  },
-
-  removeItem: (key) => {
-    try {
-      localStorage.removeItem(key);
-      return true;
-    } catch (error) {
-      console.error(`Failed to remove ${key}:`, error);
-      return false;
-    }
-  },
-
-  clear: () => {
-    try {
-      Object.values(AUTH_STORAGE_KEYS).forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      // Clear other auth-related items
-      localStorage.removeItem('securityEvents');
-      
-      return true;
-    } catch (error) {
-      console.error('Failed to clear auth storage:', error);
-      return false;
-    }
-  }
-};
-
-// Enhanced authentication service
+// Enhanced authentication service that works with the new token refresh system
 export const authService = {
   /**
    * Login user with credentials
@@ -104,7 +14,10 @@ export const authService = {
         throw new Error('Username and password are required');
       }
 
-      // Call API login (this will automatically store tokens via the API service)
+      // Clear any existing tokens before login
+      tokenUtils.clearTokens();
+
+      // Call API login (tokens are automatically stored in the API service)
       const response = await apiService.auth.login({ username, password });
       const { token, user } = response;
 
@@ -112,18 +25,11 @@ export const authService = {
         throw new Error('Invalid login response from server');
       }
 
-      // Log successful login
-      authService.logSecurityEvent('LOGIN_SUCCESS', { username });
-
+      console.log('✅ Login successful for user:', user.username);
       return { token, user };
+
     } catch (error) {
-      // Log failed login attempt
-      authService.logSecurityEvent('LOGIN_FAILED', { 
-        username: credentials.username,
-        error: error.message 
-      });
-      
-      console.error('Login error:', error);
+      console.error('❌ Login failed:', error);
       throw new Error(error.response?.data?.message || error.message || 'Login failed');
     }
   },
@@ -133,25 +39,19 @@ export const authService = {
    */
   logout: async (reason = 'user_initiated') => {
     try {
-      const user = authService.getCurrentUser();
+      console.log(`🚪 Logging out: ${reason}`);
       
-      // Log logout event
-      authService.logSecurityEvent('LOGOUT', { reason, username: user?.username });
-
       // Call API logout (this will clear tokens automatically)
       await apiService.auth.logout();
       
+      console.log('✅ Logout successful');
       return true;
+
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('❌ Logout error:', error);
       
-      // Force clear session even if logout fails
+      // Force clear tokens even if logout API call fails
       tokenUtils.clearTokens();
-      
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
-      
       return false;
     }
   },
@@ -161,61 +61,75 @@ export const authService = {
    */
   getCurrentUser: () => {
     try {
-      const user = secureStorage.getItem(AUTH_STORAGE_KEYS.USER);
+      const userString = localStorage.getItem('user');
+      if (!userString) return null;
       
-      if (!user) return null;
+      const user = JSON.parse(userString);
       
       // Validate user object structure
-      if (typeof user === 'object' && user.id && user.username) {
+      if (user && typeof user === 'object' && user.id && user.username) {
         return user;
       }
       
-      console.warn('Invalid user data structure, clearing storage');
-      secureStorage.removeItem(AUTH_STORAGE_KEYS.USER);
+      console.warn('⚠️ Invalid user data structure, clearing storage');
+      localStorage.removeItem('user');
       return null;
+
     } catch (error) {
-      console.error('Error getting current user:', error);
-      secureStorage.removeItem(AUTH_STORAGE_KEYS.USER);
+      console.error('❌ Error getting current user:', error);
+      localStorage.removeItem('user');
       return null;
     }
-  },
-
-  /**
-   * Get authentication token (uses the enhanced token utils)
-   */
-  getToken: () => {
-    return tokenUtils.getAccessToken();
-  },
-
-  /**
-   * Get refresh token
-   */
-  getRefreshToken: () => {
-    return tokenUtils.getRefreshToken();
   },
 
   /**
    * Check if user is authenticated
    */
   isAuthenticated: () => {
-    const token = authService.getToken();
-    const user = authService.getCurrentUser();
-    return !!(token && user);
+    const hasToken = !!tokenUtils.getAccessToken();
+    const hasRefreshToken = !!tokenUtils.getRefreshToken();
+    const hasUser = !!authService.getCurrentUser();
+    
+    return hasToken && hasRefreshToken && hasUser;
   },
 
   /**
-   * Check if token is valid (uses enhanced token utils)
+   * Check if current tokens are valid
    */
   isTokenValid: () => {
-    const token = authService.getToken();
-    return validateToken(token);
+    const accessToken = tokenUtils.getAccessToken();
+    
+    if (!accessToken) return false;
+    
+    return tokenUtils.isValidTokenFormat(accessToken);
   },
 
   /**
-   * Check if token is expired (uses enhanced token utils)
+   * Check if token should be refreshed
    */
-  isTokenExpired: () => {
-    return tokenUtils.isTokenExpired();
+  shouldRefreshToken: () => {
+    return tokenUtils.shouldRefreshToken();
+  },
+
+  /**
+   * Manually refresh access token
+   */
+  refreshToken: async () => {
+    try {
+      console.log('🔄 Manual token refresh requested');
+      const newToken = await tokenUtils.refreshTokens();
+      
+      if (newToken) {
+        console.log('✅ Manual token refresh successful');
+        return newToken;
+      }
+      
+      throw new Error('No new token received');
+
+    } catch (error) {
+      console.error('❌ Manual token refresh failed:', error);
+      throw error;
+    }
   },
 
   /**
@@ -224,7 +138,7 @@ export const authService = {
   refreshUserData: async () => {
     try {
       if (!authService.isAuthenticated()) {
-        console.warn('User not authenticated, cannot refresh data');
+        console.warn('⚠️ User not authenticated, cannot refresh data');
         return null;
       }
 
@@ -232,38 +146,18 @@ export const authService = {
       const user = response.data;
       
       if (user) {
-        secureStorage.setItem(AUTH_STORAGE_KEYS.USER, user);
-        
-        authService.logSecurityEvent('USER_DATA_REFRESHED', { userId: user.id });
+        localStorage.setItem('user', JSON.stringify(user));
+        console.log('✅ User data refreshed');
         return user;
       }
       
       return null;
-    } catch (error) {
-      console.error('Failed to refresh user data:', error);
-      
-      // If it's an auth error, the interceptor will handle logout
-      // For other errors, return null but don't logout
-      return null;
-    }
-  },
 
-  /**
-   * Manually refresh access token
-   */
-  refreshToken: async () => {
-    try {
-      const newToken = await tokenUtils.refreshToken();
-      
-      if (newToken) {
-        authService.logSecurityEvent('MANUAL_TOKEN_REFRESH');
-        return newToken;
-      }
-      
-      throw new Error('No new token received');
     } catch (error) {
-      console.error('Manual token refresh failed:', error);
-      throw error;
+      console.error('❌ Failed to refresh user data:', error);
+      
+      // Don't logout on user data refresh failure - let the API interceptor handle auth errors
+      return null;
     }
   },
 
@@ -273,27 +167,24 @@ export const authService = {
   updateUser: (userData) => {
     try {
       if (!userData || typeof userData !== 'object') {
-        console.error('Invalid user data provided');
+        console.error('❌ Invalid user data provided');
         return false;
       }
 
       const currentUser = authService.getCurrentUser();
       if (!currentUser) {
-        console.error('No current user to update');
+        console.error('❌ No current user to update');
         return false;
       }
 
       const updatedUser = { ...currentUser, ...userData };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
       
-      const success = secureStorage.setItem(AUTH_STORAGE_KEYS.USER, updatedUser);
-      
-      if (success) {
-        authService.logSecurityEvent('USER_DATA_UPDATED', { userId: updatedUser.id });
-      }
-      
-      return success;
+      console.log('✅ User data updated');
+      return true;
+
     } catch (error) {
-      console.error('Error updating user data:', error);
+      console.error('❌ Error updating user data:', error);
       return false;
     }
   },
@@ -314,10 +205,11 @@ export const authService = {
         new_password: newPassword
       });
 
-      authService.logSecurityEvent('PASSWORD_CHANGED');
+      console.log('✅ Password changed successfully');
       return response.data;
+
     } catch (error) {
-      authService.logSecurityEvent('PASSWORD_CHANGE_FAILED', { error: error.message });
+      console.error('❌ Password change failed:', error);
       throw new Error(error.response?.data?.message || 'Failed to change password');
     }
   },
@@ -332,10 +224,11 @@ export const authService = {
       }
 
       const response = await apiService.auth.forgotPassword({ email });
-      
-      authService.logSecurityEvent('PASSWORD_RESET_REQUESTED', { email });
+      console.log('✅ Password reset requested');
       return response.data;
+
     } catch (error) {
+      console.error('❌ Password reset request failed:', error);
       throw new Error(error.response?.data?.message || 'Failed to request password reset');
     }
   },
@@ -356,10 +249,11 @@ export const authService = {
         new_password: password
       });
 
-      authService.logSecurityEvent('PASSWORD_RESET_COMPLETED');
+      console.log('✅ Password reset completed');
       return response.data;
+
     } catch (error) {
-      authService.logSecurityEvent('PASSWORD_RESET_FAILED', { error: error.message });
+      console.error('❌ Password reset failed:', error);
       throw new Error(error.response?.data?.message || 'Failed to reset password');
     }
   },
@@ -370,10 +264,10 @@ export const authService = {
   clearSession: () => {
     try {
       tokenUtils.clearTokens();
-      authService.logSecurityEvent('SESSION_CLEARED');
+      console.log('✅ Session cleared');
       return true;
     } catch (error) {
-      console.error('Error clearing session:', error);
+      console.error('❌ Error clearing session:', error);
       return false;
     }
   },
@@ -389,7 +283,7 @@ export const authService = {
     // Admin has all permissions
     if (currentUser.role_name === 'Administrator') return true;
     
-    // Define role permissions mapping
+    // Define role-based permissions
     const rolePermissions = {
       'Financial Manager': [
         'account_create', 'account_read', 'account_update',
@@ -418,107 +312,60 @@ export const authService = {
   },
 
   /**
-   * Log security events
+   * Get authentication status info for debugging
    */
-  logSecurityEvent: (eventType, details = {}) => {
-    try {
-      const user = authService.getCurrentUser();
-      const securityEvent = {
-        timestamp: new Date().toISOString(),
-        eventType,
-        userId: user?.id,
-        username: user?.username,
-        details,
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-        sessionId: secureStorage.getItem('sessionId') || 'unknown'
-      };
-
-      // Store locally (in production, also send to server)
-      const events = secureStorage.getItem('securityEvents') || [];
-      events.push(securityEvent);
-      
-      // Keep only last 100 events
-      const recentEvents = events.slice(-100);
-      secureStorage.setItem('securityEvents', recentEvents);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Security Event:', securityEvent);
-      }
-    } catch (error) {
-      console.error('Failed to log security event:', error);
-    }
-  },
-
-  /**
-   * Get security events
-   */
-  getSecurityEvents: (limit = 50) => {
-    try {
-      const events = secureStorage.getItem('securityEvents') || [];
-      return events.slice(-limit).reverse(); // Most recent first
-    } catch (error) {
-      console.error('Failed to get security events:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Auto-logout setup (for session timeout)
-   */
-  setupAutoLogout: (timeoutMinutes = 30) => {
-    let timeoutId;
+  getAuthStatus: () => {
+    const user = authService.getCurrentUser();
+    const tokenDebug = tokenUtils.getTokenDebugInfo ? tokenUtils.getTokenDebugInfo() : {};
     
-    const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      
-      timeoutId = setTimeout(() => {
-        authService.logout('session_timeout');
-      }, timeoutMinutes * 60 * 1000);
+    return {
+      isAuthenticated: authService.isAuthenticated(),
+      isTokenValid: authService.isTokenValid(),
+      shouldRefreshToken: authService.shouldRefreshToken(),
+      user: user ? {
+        id: user.id,
+        username: user.username,
+        role: user.role_name,
+        email: user.email
+      } : null,
+      tokens: tokenDebug,
+      timestamp: new Date().toISOString()
     };
+  },
 
-    // Activity events
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+  /**
+   * Setup automatic token monitoring (optional)
+   */
+  setupTokenMonitoring: (intervalMinutes = 1) => {
+    console.log(`🔧 Setting up token monitoring (every ${intervalMinutes} minute(s))`);
     
-    const handleActivity = () => {
+    const monitoringInterval = setInterval(() => {
       if (authService.isAuthenticated()) {
-        resetTimer();
+        const status = authService.getAuthStatus();
+        
+        if (status.shouldRefreshToken && !status.tokens.isRefreshing) {
+          console.log('🔄 Token monitoring triggered refresh');
+          authService.refreshToken().catch(error => {
+            console.warn('⚠️ Monitoring refresh failed:', error.message);
+          });
+        }
+        
+        // Log status in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📊 Auth Status:', {
+            authenticated: status.isAuthenticated,
+            shouldRefresh: status.shouldRefreshToken,
+            timeUntilExpiry: status.tokens.timeUntilExpiry ? 
+              `${Math.round(status.tokens.timeUntilExpiry / 1000 / 60)}min` : 'unknown'
+          });
+        }
       }
-    };
-
-    // Add event listeners
-    events.forEach(event => {
-      if (typeof document !== 'undefined') {
-        document.addEventListener(event, handleActivity, true);
-      }
-    });
-
-    // Initial timer
-    resetTimer();
+    }, intervalMinutes * 60 * 1000);
 
     // Return cleanup function
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach(event => {
-        if (typeof document !== 'undefined') {
-          document.removeEventListener(event, handleActivity, true);
-        }
-      });
-    };
-  },
-
-  /**
-   * Get token information for debugging
-   */
-  getTokenInfo: () => {
-    const accessToken = authService.getToken();
-    const refreshToken = authService.getRefreshToken();
-    
-    return {
-      hasAccessToken: !!accessToken,
-      hasRefreshToken: !!refreshToken,
-      isTokenValid: authService.isTokenValid(),
-      isTokenExpired: authService.isTokenExpired(),
-      user: authService.getCurrentUser(),
+      clearInterval(monitoringInterval);
+      console.log('🛑 Token monitoring stopped');
     };
   },
 
@@ -527,6 +374,7 @@ export const authService = {
    */
   forceRefresh: async () => {
     try {
+      console.log('🔄 Force refresh initiated');
       const newToken = await authService.refreshToken();
       console.log('✅ Force refresh successful');
       return newToken;
@@ -534,14 +382,96 @@ export const authService = {
       console.error('❌ Force refresh failed:', error);
       throw error;
     }
+  },
+
+  /**
+   * Test authentication flow (for development/testing)
+   */
+  testAuthFlow: async () => {
+    if (process.env.NODE_ENV !== 'development') {
+      console.warn('⚠️ testAuthFlow is only available in development');
+      return;
+    }
+
+    console.group('🧪 Testing Authentication Flow');
+    
+    try {
+      // Test current status
+      const initialStatus = authService.getAuthStatus();
+      console.log('📊 Initial Status:', initialStatus);
+
+      if (!initialStatus.isAuthenticated) {
+        console.log('❌ Not authenticated - cannot test token refresh');
+        return;
+      }
+
+      // Test token refresh
+      if (initialStatus.shouldRefreshToken) {
+        console.log('🔄 Testing token refresh...');
+        await authService.refreshToken();
+        console.log('✅ Token refresh test passed');
+      } else {
+        console.log('ℹ️ Token doesn\'t need refresh yet');
+      }
+
+      // Test user data refresh
+      console.log('👤 Testing user data refresh...');
+      const refreshedUser = await authService.refreshUserData();
+      console.log('✅ User data refresh test passed:', !!refreshedUser);
+
+      // Final status
+      const finalStatus = authService.getAuthStatus();
+      console.log('📊 Final Status:', finalStatus);
+
+    } catch (error) {
+      console.error('❌ Auth flow test failed:', error);
+    } finally {
+      console.groupEnd();
+    }
   }
 };
 
 // Export additional utilities
 export const authUtils = {
-  validateToken,
-  secureStorage,
-  AUTH_STORAGE_KEYS,
+  // Token validation
+  isValidTokenFormat: tokenUtils.isValidTokenFormat,
+  
+  // Permission helpers
+  requirePermission: (permission, user = null) => {
+    if (!authService.hasPermission(permission, user)) {
+      throw new Error(`Permission "${permission}" required`);
+    }
+  },
+
+  // Role helpers
+  isAdmin: (user = null) => {
+    const currentUser = user || authService.getCurrentUser();
+    return currentUser?.role_name === 'Administrator';
+  },
+
+  isFinancialManager: (user = null) => {
+    const currentUser = user || authService.getCurrentUser();
+    return currentUser?.role_name === 'Financial Manager';
+  },
+
+  // Authentication state helpers
+  waitForAuth: (timeoutMs = 5000) => {
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      
+      const checkAuth = () => {
+        if (authService.isAuthenticated()) {
+          resolve(true);
+        } else if (Date.now() - startTime > timeoutMs) {
+          reject(new Error('Authentication timeout'));
+        } else {
+          setTimeout(checkAuth, 100);
+        }
+      };
+      
+      checkAuth();
+    });
+  }
 };
 
 export default authService;
