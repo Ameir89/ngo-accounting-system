@@ -1,5 +1,5 @@
-// frontend/src/contexts/AuthContext.jsx - Fixed version to prevent infinite loops
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+// frontend/src/contexts/AuthContext.jsx - Enhanced with better state management
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { authService } from '../services/auth';
 
 const AuthContext = createContext();
@@ -16,38 +16,55 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState(null);
   
-  // Use ref to prevent infinite loops
+  // Use refs to prevent infinite loops and unnecessary re-renders
   const initializationRef = useRef(false);
+  const autoLogoutCleanupRef = useRef(null);
+  const refreshIntervalRef = useRef(null);
 
-  // Memoize the auth check function to prevent recreating on every render
+  // Memoized auth check function
   const checkAuth = useCallback(async () => {
     // Prevent multiple initialization attempts
-    if (initializationRef.current) return;
+    if (initializationRef.current) {
+      return;
+    }
     initializationRef.current = true;
 
     try {
-      const savedUser = authService.getCurrentUser();
-      const token = authService.getToken();
+      setError(null);
       
-      if (savedUser && token) {
-        // Try to refresh user data, but don't fail if it doesn't work
-        try {
-          const userData = await authService.refreshUserData();
-          setUser(userData || savedUser);
-        } catch (refreshError) {
-          console.warn('Failed to refresh user data, using cached user:', refreshError);
-          // Use cached user data if refresh fails
-          setUser(savedUser);
+      // Check if user is authenticated with valid token
+      if (authService.isAuthenticated()) {
+        const currentUser = authService.getCurrentUser();
+        const isTokenValid = authService.isTokenValid();
+        
+        if (currentUser && isTokenValid) {
+          // Try to refresh user data silently
+          try {
+            const refreshedUser = await authService.refreshUserData();
+            setUser(refreshedUser || currentUser);
+          } catch (refreshError) {
+            console.warn('Failed to refresh user data, using cached user:', refreshError);
+            // Use cached user data if refresh fails (non-critical error)
+            setUser(currentUser);
+          }
+        } else {
+          // Invalid token or user data
+          console.warn('Invalid authentication state, clearing session');
+          authService.clearSession();
+          setUser(null);
         }
       } else {
         setUser(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
+      setError(error.message);
+      
       // Only logout if there was a real authentication error
       if (error.response?.status === 401) {
-        authService.logout();
+        authService.clearSession();
       }
       setUser(null);
     } finally {
@@ -56,87 +73,294 @@ export const AuthProvider = ({ children }) => {
     }
   }, []); // Empty dependency array is correct here
 
-  // Initialize auth state only once
+  // Initialize authentication state
   useEffect(() => {
     if (!isInitialized) {
       checkAuth();
     }
   }, [checkAuth, isInitialized]);
 
+  // Setup auto-logout and refresh intervals
+  useEffect(() => {
+    if (isInitialized && user) {
+      // Setup auto-logout for session timeout
+      autoLogoutCleanupRef.current = authService.setupAutoLogout(30); // 30 minutes
+
+      // Setup periodic token validation (every 5 minutes)
+      refreshIntervalRef.current = setInterval(() => {
+        if (authService.isAuthenticated() && authService.isTokenValid()) {
+          // Token is still valid, optionally refresh user data
+          authService.refreshUserData().catch(error => {
+            console.warn('Background user data refresh failed:', error);
+            if (error.response?.status === 401) {
+              handleLogout('token_expired');
+            }
+          });
+        } else {
+          // Token is invalid, logout user
+          handleLogout('token_invalid');
+        }
+      }, 5 * 60 * 1000); // 5 minutes
+
+      return () => {
+        // Cleanup
+        if (autoLogoutCleanupRef.current) {
+          autoLogoutCleanupRef.current();
+          autoLogoutCleanupRef.current = null;
+        }
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
+        }
+      };
+    }
+  }, [isInitialized, user]);
+
+  // Enhanced login function
   const login = useCallback(async (credentials) => {
     try {
       setLoading(true);
+      setError(null);
+      
       const { user: userData } = await authService.login(credentials);
       setUser(userData);
+      
       return userData;
     } catch (error) {
+      console.error('Login failed:', error);
+      setError(error.message);
+      setUser(null);
       throw error;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const logout = useCallback(() => {
-    setUser(null);
-    setLoading(false);
-    authService.logout();
+  // Enhanced logout function
+  const handleLogout = useCallback(async (reason = 'user_initiated') => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Cleanup intervals
+      if (autoLogoutCleanupRef.current) {
+        autoLogoutCleanupRef.current();
+        autoLogoutCleanupRef.current = null;
+      }
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+      
+      await authService.logout(reason);
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force clear state even if logout fails
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  // Update user function
   const updateUser = useCallback((userData) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+    try {
+      const success = authService.updateUser(userData);
+      if (success) {
+        setUser(prevUser => ({ ...prevUser, ...userData }));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to update user:', error);
+      setError('Failed to update user data');
+      return false;
+    }
   }, []);
 
+  // Permission check function
   const hasPermission = useCallback((permission) => {
-    if (!user || !user.role_name) return false;
-    
-    // Admin has all permissions
-    if (user.role_name === 'Administrator') return true;
-    
-    // Define role permissions
-    const rolePermissions = {
-      'Financial Manager': [
-        'account_create', 'account_read', 'account_update',
-        'journal_create', 'journal_read', 'journal_update', 'journal_post',
-        'cost_center_read', 'project_read', 'budget_read',
-        'grant_read', 'supplier_read', 'asset_read',
-        'reports_read', 'dashboard_read'
-      ],
-      'Accountant': [
-        'account_read', 'journal_create', 'journal_read',
-        'cost_center_read', 'project_read', 'reports_read', 'dashboard_read'
-      ],
-      'Data Entry Clerk': [
-        'account_read', 'journal_create', 'journal_read',
-        'cost_center_read', 'project_read', 'dashboard_read'
-      ],
-      'Auditor': [
-        'account_read', 'journal_read', 'cost_center_read', 'project_read',
-        'budget_read', 'grant_read', 'supplier_read', 'asset_read',
-        'reports_read', 'dashboard_read', 'audit_read'
-      ]
-    };
-
-    const userPermissions = rolePermissions[user.role_name] || [];
-    return userPermissions.includes(permission);
+    return authService.hasPermission(permission, user);
   }, [user]);
 
+  // Change password function
+  const changePassword = useCallback(async (passwordData) => {
+    try {
+      setError(null);
+      const result = await authService.changePassword(passwordData);
+      return result;
+    } catch (error) {
+      console.error('Password change failed:', error);
+      setError(error.message);
+      throw error;
+    }
+  }, []);
+
+  // Request password reset function
+  const requestPasswordReset = useCallback(async (email) => {
+    try {
+      setError(null);
+      const result = await authService.requestPasswordReset(email);
+      return result;
+    } catch (error) {
+      console.error('Password reset request failed:', error);
+      setError(error.message);
+      throw error;
+    }
+  }, []);
+
+  // Reset password function
+  const resetPassword = useCallback(async (resetData) => {
+    try {
+      setError(null);
+      const result = await authService.resetPassword(resetData);
+      return result;
+    } catch (error) {
+      console.error('Password reset failed:', error);
+      setError(error.message);
+      throw error;
+    }
+  }, []);
+
+  // Get security events function
+  const getSecurityEvents = useCallback((limit = 50) => {
+    return authService.getSecurityEvents(limit);
+  }, []);
+
+  // Refresh user data function
+  const refreshUserData = useCallback(async () => {
+    try {
+      setError(null);
+      const refreshedUser = await authService.refreshUserData();
+      if (refreshedUser) {
+        setUser(refreshedUser);
+        return refreshedUser;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+      setError(error.message);
+      
+      // If auth error, logout user
+      if (error.response?.status === 401) {
+        await handleLogout('auth_failed');
+      }
+      
+      throw error;
+    }
+  }, [handleLogout]);
+
   // Memoize the context value to prevent unnecessary re-renders
-  const contextValue = {
+  const contextValue = useMemo(() => ({
+    // State
     user,
     loading,
-    login,
-    logout,
-    updateUser,
-    hasPermission,
+    isInitialized,
+    error,
     isAuthenticated: !!user,
-  };
+    
+    // Auth actions
+    login,
+    logout: handleLogout,
+    updateUser,
+    refreshUserData,
+    
+    // Permission utilities
+    hasPermission,
+    
+    // Password management
+    changePassword,
+    requestPasswordReset,
+    resetPassword,
+    
+    // Security utilities
+    getSecurityEvents,
+    
+    // Utility functions
+    clearError: () => setError(null),
+  }), [
+    user,
+    loading,
+    isInitialized,
+    error,
+    login,
+    handleLogout,
+    updateUser,
+    refreshUserData,
+    hasPermission,
+    changePassword,
+    requestPasswordReset,
+    resetPassword,
+    getSecurityEvents,
+  ]);
 
   return (
     <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
+};
+
+// Enhanced useAuth hook with additional utilities
+export const useAuth = () => {
+  const context = useAuthContext();
+  
+  // Additional derived values
+  const isAdmin = useMemo(() => {
+    return context.user?.role_name === 'Administrator';
+  }, [context.user]);
+
+  const userDisplayName = useMemo(() => {
+    const { user } = context;
+    if (!user) return '';
+    
+    const firstName = user.first_name || '';
+    const lastName = user.last_name || '';
+    
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    } else if (firstName) {
+      return firstName;
+    } else if (lastName) {
+      return lastName;
+    } else {
+      return user.username || user.email || 'User';
+    }
+  }, [context.user]);
+
+  const userRole = useMemo(() => {
+    return context.user?.role_name || 'Guest';
+  }, [context.user]);
+
+  return {
+    ...context,
+    isAdmin,
+    userDisplayName,
+    userRole,
+  };
+};
+
+// Permission-based component wrapper
+export const ProtectedComponent = ({ permission, fallback = null, children }) => {
+  const { hasPermission } = useAuth();
+  
+  if (!hasPermission(permission)) {
+    return fallback;
+  }
+  
+  return children;
+};
+
+// Role-based component wrapper
+export const RoleProtectedComponent = ({ allowedRoles = [], fallback = null, children }) => {
+  const { user } = useAuth();
+  
+  if (!user || !allowedRoles.includes(user.role_name)) {
+    return fallback;
+  }
+  
+  return children;
 };
 
 export default AuthContext;

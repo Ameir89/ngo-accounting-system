@@ -26,25 +26,21 @@ const api = axios.create({
   },
 });
 
-// Enhanced request interceptor
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Add auth token
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Add request ID for tracking
     config.metadata = { requestId: Date.now().toString() };
     
-    // Log request in development
     if (process.env.NODE_ENV === 'development') {
       console.log('🚀 API Request:', {
         url: `${config.baseURL}${config.url}`,
         method: config.method.toUpperCase(),
         data: config.data,
-        headers: config.headers
       });
     }
 
@@ -56,10 +52,9 @@ api.interceptors.request.use(
   }
 );
 
-// Enhanced response interceptor with better error handling
+// Enhanced response interceptor
 api.interceptors.response.use(
   (response) => {
-    // Log successful responses in development
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ API Response:', {
         url: response.config.url,
@@ -70,137 +65,80 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    const { response, request, message } = error;
+    const { response, request } = error;
     
-    // Handle different error types
     if (response) {
-      // Server responded with error status
       const { status, data } = response;
       
       switch (status) {
         case 400:
-          handleBadRequest(data);
+          toast.error(data?.message || 'Invalid request data');
           break;
         case 401:
-          handleUnauthorized();
+          toast.error('Session expired. Please login again.');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          setTimeout(() => window.location.href = '/login', 1000);
           break;
         case 403:
-          handleForbidden(data);
+          toast.error(data?.message || 'You do not have permission to perform this action');
           break;
         case 404:
-          handleNotFound(data);
+          toast.error(data?.message || 'Resource not found');
           break;
         case 422:
-          handleValidationError(data);
+          if (data?.errors && typeof data.errors === 'object') {
+            Object.values(data.errors).flat().forEach(msg => toast.error(msg));
+          } else {
+            toast.error(data?.message || 'Validation failed');
+          }
           break;
         case 500:
-          handleServerError(data);
+          toast.error(data?.message || 'Internal server error. Please try again later.');
           break;
         default:
-          handleGenericError(data, status);
+          toast.error(data?.message || `Server error (${status})`);
       }
       
-      // Log error in development
       if (process.env.NODE_ENV === 'development') {
         console.error('❌ API Error Response:', {
           url: response.config.url,
           status,
           data,
-          message: data?.message
         });
       }
       
-      return Promise.reject(createEnhancedError(response));
+      const enhancedError = new Error(data?.message || 'API Error');
+      enhancedError.response = response;
+      enhancedError.status = status;
+      enhancedError.data = data;
+      return Promise.reject(enhancedError);
     } else if (request) {
-      // Network error
-      handleNetworkError();
-      return Promise.reject(new Error('Network error - please check your connection'));
+      toast.error('Network error - please check your connection');
+      return Promise.reject(new Error('Network error'));
     } else {
-      // Request setup error
-      console.error('❌ Request Setup Error:', message);
+      console.error('❌ Request Setup Error:', error.message);
       return Promise.reject(new Error('Request configuration error'));
     }
   }
 );
 
-// Error handlers
-const handleBadRequest = (data) => {
-  const message = data?.message || 'Invalid request data';
-  toast.error(message);
-};
-
-const handleUnauthorized = () => {
-  toast.error('Session expired. Please login again.');
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('user');
-  // Delay redirect to allow toast to show
-  setTimeout(() => {
-    window.location.href = '/login';
-  }, 1000);
-};
-
-const handleForbidden = (data) => {
-  const message = data?.message || 'You do not have permission to perform this action';
-  toast.error(message);
-};
-
-const handleNotFound = (data) => {
-  const message = data?.message || 'Resource not found';
-  toast.error(message);
-};
-
-const handleValidationError = (data) => {
-  if (data?.errors && typeof data.errors === 'object') {
-    // Handle field-specific validation errors
-    const errorMessages = Object.values(data.errors).flat();
-    errorMessages.forEach(msg => toast.error(msg));
-  } else {
-    toast.error(data?.message || 'Validation failed');
-  }
-};
-
-const handleServerError = (data) => {
-  const message = data?.message || 'Internal server error. Please try again later.';
-  toast.error(message);
-};
-
-const handleGenericError = (data, status) => {
-  const message = data?.message || `Server error (${status})`;
-  toast.error(message);
-};
-
-const handleNetworkError = () => {
-  toast.error('Network error - please check your internet connection');
-};
-
-const createEnhancedError = (response) => {
-  const error = new Error(response.data?.message || 'API Error');
-  error.response = response;
-  error.status = response.status;
-  error.data = response.data;
-  return error;
-};
-
-// Enhanced API service with better structure
+// Enhanced API service with consistent structure
 export const apiService = {
   // Authentication endpoints
   auth: {
     login: async (credentials) => {
-      try {
-        const response = await api.post('/auth/login', credentials);
-        const { access_token, user } = response.data;
-        
-        // Store authentication data
-        localStorage.setItem('authToken', access_token);
-        localStorage.setItem('user', JSON.stringify(user));
-        
-        return { token: access_token, user };
-      } catch (error) {
-        throw new Error(error.response?.data?.message || 'Login failed');
-      }
+      const response = await api.post('/auth/login', credentials);
+      const { access_token, user } = response.data;
+      
+      localStorage.setItem('authToken', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return { token: access_token, user };
     },
-    // ADD THIS MISSING METHOD
+    
     getMe: () => api.get('/auth/me'),
+    
     logout: async () => {
       try {
         await api.post('/auth/logout');
@@ -209,7 +147,6 @@ export const apiService = {
       } finally {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
-        window.location.href = '/login';
       }
     },
     
@@ -316,12 +253,38 @@ export const apiService = {
     }),
   },
 
-  // Dashboard
+  // Fixed Dashboard service - this was the main issue
   dashboard: {
+    // Method that was missing and causing the error
+    getSummary: (params = {}) => api.get('/dashboard/overview', { params }),
+    
+    // Additional dashboard methods
     getOverview: (params = {}) => api.get('/dashboard/overview', { params }),
     getFinancialSummary: (params = {}) => api.get('/dashboard/financial-summary', { params }),
     getRevenueChart: (params = {}) => api.get('/dashboard/charts/revenue-trend', { params }),
     getExpenseChart: (params = {}) => api.get('/dashboard/charts/expense-breakdown', { params }),
+    
+    // New comprehensive method for dashboard data
+    getComprehensiveData: async (params = {}) => {
+      try {
+        const [overview, financialSummary, revenueChart, expenseChart] = await Promise.allSettled([
+          api.get('/dashboard/overview', { params }),
+          api.get('/dashboard/financial-summary', { params }),
+          api.get('/dashboard/charts/revenue-trend', { params }),
+          api.get('/dashboard/charts/expense-breakdown', { params }),
+        ]);
+
+        return {
+          overview: overview.status === 'fulfilled' ? overview.value.data : null,
+          financialSummary: financialSummary.status === 'fulfilled' ? financialSummary.value.data : null,
+          revenueChart: revenueChart.status === 'fulfilled' ? revenueChart.value.data : null,
+          expenseChart: expenseChart.status === 'fulfilled' ? expenseChart.value.data : null,
+        };
+      } catch (error) {
+        console.error('Failed to fetch comprehensive dashboard data:', error);
+        throw error;
+      }
+    },
   },
 
   // Data Exchange
@@ -362,17 +325,21 @@ export const apiService = {
     },
     download: (fileId) => api.get(`/files/${fileId}/download`, { responseType: 'blob' }),
   },
+
+  // Health check
+  health: {
+    check: () => api.get('/health'),
+  }
 };
 
-// API health check
+// API health check function
 export const checkApiHealth = async () => {
   try {
-    const response = await api.get('/health');
+    const response = await apiService.health.check();
     return response.data;
   } catch (error) {
     throw new Error('API is not available');
   }
 };
 
-// Export the axios instance for direct use if needed
 export default api;

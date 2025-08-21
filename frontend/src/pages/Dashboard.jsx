@@ -1,305 +1,63 @@
-// frontend/src/pages/Dashboard.jsx - Optimized Version
-import {
-  Activity,
-  AlertTriangle,
-  ArrowDownRight,
-  ArrowUpRight,
-  BarChart3,
-  Building, Calendar,
-  CheckCircle,
-  DollarSign, FileText,
-  PieChart,
-  TrendingUp, Users,
-  Zap
-} from 'lucide-react';
-import { Suspense, lazy, memo, useMemo, useState } from 'react';
+// frontend/src/pages/Dashboard.jsx - Enhanced with proper error handling and data management
+import { AlertCircle, DollarSign, RefreshCw, TrendingDown, TrendingUp, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+
+// Components
+import BudgetChart from '../components/Charts/BudgetChart';
+import FinancialChart from '../components/Charts/FinancialChart';
+import RevenueChart from '../components/Charts/RevenueChart';
 import ErrorMessage from '../components/UI/ErrorMessage';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
+
+// Hooks and Services
 import { useLanguage } from '../contexts/LanguageContext';
-import { useDashboardData } from '../hooks/useApi';
+import { useComprehensiveDashboard, useDashboardOverview } from '../hooks/useApi';
+import { dashboardService } from '../services/dashboardService';
+import { errorHandler } from '../services/errorHandling';
 
-// Lazy load chart components for better performance
-const FinancialChart = lazy(() => import('../components/Charts/FinancialChart'));
-const RevenueChart = lazy(() => import('../components/Charts/RevenueChart'));
-const BudgetChart = lazy(() => import('../components/Charts/BudgetChart'));
-
-// Memoized Summary Card Component
-const SummaryCard = memo(({ 
+// Dashboard Card Component
+const DashboardCard = ({ 
   title, 
   value, 
   icon: Icon, 
-  color, 
-  change, 
-  changeType,
-  trend,
+  trend, 
+  subtitle,
+  color = 'blue',
   loading = false,
-  onClick,
-  description
+  error = null 
 }) => {
-  const getChangeIcon = () => {
-    if (changeType === 'positive') return ArrowUpRight;
-    if (changeType === 'negative') return ArrowDownRight;
-    return null;
+  const colorClasses = {
+    blue: 'bg-blue-500 text-white',
+    green: 'bg-green-500 text-white',
+    red: 'bg-red-500 text-white',
+    yellow: 'bg-yellow-500 text-white',
+    purple: 'bg-purple-500 text-white',
   };
 
-  const ChangeIcon = getChangeIcon();
+  const getTrendIcon = () => {
+    if (!trend) return null;
+    return trend.direction === 'up' ? TrendingUp : TrendingDown;
+  };
+
+  const getTrendColor = () => {
+    if (!trend) return '';
+    return trend.direction === 'up' ? 'text-green-600' : 'text-red-600';
+  };
+
+  const TrendIcon = getTrendIcon();
 
   if (loading) {
     return (
-      <div className="card animate-pulse">
-        <div className="card-body">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="animate-pulse">
           <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+            <div className="ml-4 flex-1">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div 
-      className={`card transition-all duration-200 hover:shadow-lg ${onClick ? 'cursor-pointer hover:scale-105' : ''}`}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
-    >
-      <div className="card-body">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">
-            <div className={`${color} rounded-lg p-3 shadow-sm`}>
-              <Icon className="h-6 w-6 text-white" aria-hidden="true" />
-            </div>
-          </div>
-          <div className="ml-5 w-0 flex-1">
-            <dl>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                {title}
-              </dt>
-              <dd className="flex items-baseline">
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {value}
-                </div>
-                {change && ChangeIcon && (
-                  <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                    changeType === 'positive' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                  }`}>
-                    <ChangeIcon className="h-4 w-4 mr-1" />
-                    {change}
-                  </div>
-                )}
-              </dd>
-              {description && (
-                <dd className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {description}
-                </dd>
-              )}
-            </dl>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
-
-SummaryCard.displayName = 'SummaryCard';
-
-// Memoized Quick Action Component
-const QuickAction = memo(({ icon: Icon, title, description, onClick, color = 'bg-gray-100' }) => (
-  <button
-    onClick={onClick}
-    className="w-full p-4 text-left bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 
-               hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200 
-               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800
-               group"
-  >
-    <div className="flex items-center">
-      <div className={`${color} rounded-lg p-2 group-hover:scale-110 transition-transform duration-200`}>
-        <Icon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-      </div>
-      <div className="ml-3 flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-          {title}
-        </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-          {description}
-        </p>
-      </div>
-    </div>
-  </button>
-));
-
-QuickAction.displayName = 'QuickAction';
-
-// Memoized Recent Activity Item
-const ActivityItem = memo(({ activity, formatDate, formatCurrency }) => {
-  const getStatusIcon = () => {
-    switch (activity.status) {
-      case 'completed':
-      case 'posted':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'pending':
-      case 'draft':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <Activity className="h-4 w-4 text-gray-400" />;
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 
-                    transition-colors duration-150 rounded-lg">
-      <div className="flex items-center space-x-3 flex-1 min-w-0">
-        <div className="flex-shrink-0">
-          {getStatusIcon()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-            {activity.description || activity.entry_number}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {formatDate(activity.created_at || activity.entry_date)}
-          </p>
-        </div>
-      </div>
-      <div className="flex-shrink-0 text-right">
-        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          {formatCurrency(activity.amount || activity.total_debit)}
-        </span>
-        <div className={`text-xs px-2 py-1 rounded-full inline-block ml-2 ${
-          activity.is_posted || activity.status === 'completed' 
-            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' 
-            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-        }`}>
-          {activity.is_posted || activity.status === 'completed' ? 'Posted' : 'Draft'}
-        </div>
-      </div>
-    </div>
-  );
-});
-
-ActivityItem.displayName = 'ActivityItem';
-
-// Chart Loading Fallback
-const ChartFallback = () => (
-  <div className="h-64 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-    <LoadingSpinner size="md" message="Loading chart..." />
-  </div>
-);
-
-// Main Dashboard Component
-const Dashboard = () => {
-  const { data: dashboardData, isLoading, error, refetch } = useDashboardData();
-  const { t, formatCurrency, formatDate } = useLanguage();
-  const [selectedTimeframe, setSelectedTimeframe] = useState('month');
-
-  // Memoized summary cards data
-  const summaryCards = useMemo(() => [
-    {
-      title: t('totalCash'),
-      value: formatCurrency(dashboardData?.financial_summary?.total_cash || 0),
-      icon: DollarSign,
-      color: 'bg-blue-500',
-      change: dashboardData?.financial_summary?.cash_change || '+2.5%',
-      changeType: dashboardData?.financial_summary?.cash_change_type || 'positive',
-      description: 'Available liquid assets'
-    },
-    {
-      title: t('activeProjects'),
-      value: dashboardData?.metrics?.active_projects || 0,
-      icon: Building,
-      color: 'bg-green-500',
-      change: dashboardData?.metrics?.projects_change || '+1',
-      changeType: dashboardData?.metrics?.projects_change_type || 'positive',
-      description: 'Currently running projects'
-    },
-    {
-      title: 'Pending Approvals',
-      value: dashboardData?.metrics?.pending_approvals || 0,
-      icon: FileText,
-      color: 'bg-yellow-500',
-      change: dashboardData?.metrics?.approvals_change || '-2',
-      changeType: dashboardData?.metrics?.approvals_change_type || 'negative',
-      description: 'Items awaiting review'
-    },
-    {
-      title: 'Monthly Revenue',
-      value: formatCurrency(dashboardData?.financial_summary?.monthly_revenue || 0),
-      icon: TrendingUp,
-      color: 'bg-indigo-500',
-      change: dashboardData?.financial_summary?.revenue_change || '+12.5%',
-      changeType: dashboardData?.financial_summary?.revenue_change_type || 'positive',
-      description: `Revenue for ${new Date().toLocaleString('default', { month: 'long' })}`
-    },
-  ], [dashboardData, t, formatCurrency]);
-
-  // Memoized quick actions
-  const quickActions = useMemo(() => [
-    {
-      icon: FileText,
-      title: 'Create Journal Entry',
-      description: 'Record a new transaction',
-      action: () => console.log('Navigate to journal entry form'),
-      color: 'bg-blue-100'
-    },
-    {
-      icon: Users,
-      title: 'Add Supplier',
-      description: 'Register new vendor',
-      action: () => console.log('Navigate to supplier form'),
-      color: 'bg-green-100'
-    },
-    {
-      icon: Building,
-      title: 'New Project',
-      description: 'Start tracking project finances',
-      action: () => console.log('Navigate to project form'),
-      color: 'bg-purple-100'
-    },
-    {
-      icon: BarChart3,
-      title: 'Generate Report',
-      description: 'Create financial statement',
-      action: () => console.log('Navigate to reports'),
-      color: 'bg-orange-100'
-    },
-    {
-      icon: Calendar,
-      title: 'Schedule Review',
-      description: 'Plan financial review meeting',
-      action: () => console.log('Open calendar'),
-      color: 'bg-pink-100'
-    },
-    {
-      icon: Zap,
-      title: 'Quick Reconcile',
-      description: 'Match transactions quickly',
-      action: () => console.log('Open reconciliation'),
-      color: 'bg-yellow-100'
-    }
-  ], []);
-
-  // Handle loading and error states
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="md:flex md:items-center md:justify-between">
-          <div className="flex-1 min-w-0">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64 mb-2"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-96"></div>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <SummaryCard key={i} loading={true} />
-          ))}
         </div>
       </div>
     );
@@ -307,10 +65,270 @@ const Dashboard = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <ErrorMessage 
-          message={error.message || 'Failed to load dashboard data'} 
-          onRetry={refetch}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-red-500">
+        <div className="flex items-center">
+          <AlertCircle className="h-8 w-8 text-red-500" />
+          <div className="ml-4">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white">{title}</h3>
+            <p className="text-sm text-red-600">Failed to load</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow duration-200 p-6">
+      <div className="flex items-center">
+        <div className={`flex-shrink-0 p-3 rounded-lg ${colorClasses[color]}`}>
+          <Icon className="h-6 w-6" />
+        </div>
+        <div className="ml-4 flex-1">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {title}
+            </h3>
+            {trend && TrendIcon && (
+              <div className={`flex items-center ${getTrendColor()}`}>
+                <TrendIcon className="h-4 w-4 mr-1" />
+                <span className="text-sm font-medium">{trend.percentage}%</span>
+              </div>
+            )}
+          </div>
+          <div className="mt-1">
+            <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {value}
+            </p>
+            {subtitle && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {subtitle}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Alert Component
+const AlertCard = ({ alert, onDismiss }) => {
+  const { t } = useLanguage();
+  
+  const alertColors = {
+    info: 'border-blue-500 bg-blue-50 dark:bg-blue-900/20',
+    warning: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20',
+    danger: 'border-red-500 bg-red-50 dark:bg-red-900/20',
+    success: 'border-green-500 bg-green-50 dark:bg-green-900/20',
+  };
+
+  const iconColors = {
+    info: 'text-blue-600',
+    warning: 'text-yellow-600',
+    danger: 'text-red-600',
+    success: 'text-green-600',
+  };
+
+  return (
+    <div className={`border-l-4 p-4 ${alertColors[alert.type]}`}>
+      <div className="flex items-start">
+        <AlertCircle className={`h-5 w-5 ${iconColors[alert.type]} mt-0.5`} />
+        <div className="ml-3 flex-1">
+          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+            {alert.title}
+          </h4>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+            {alert.message}
+          </p>
+        </div>
+        {onDismiss && (
+          <button
+            onClick={() => onDismiss(alert.id)}
+            className="ml-4 text-gray-400 hover:text-gray-600"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Main Dashboard Component
+const Dashboard = () => {
+  const { t, formatCurrency } = useLanguage();
+  const [alerts, setAlerts] = useState([]);
+  const [kpis, setKpis] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(null);
+
+  // Use the enhanced dashboard hooks
+  const {
+    data: dashboardData,
+    isLoading: isDashboardLoading,
+    error: dashboardError,
+    refetch: refetchDashboard
+  } = useComprehensiveDashboard();
+
+  const {
+    data: overviewData,
+    isLoading: isOverviewLoading,
+    error: overviewError,
+    refetch: refetchOverview
+  } = useDashboardOverview();
+
+  // Load alerts and KPIs
+  useEffect(() => {
+    const loadDashboardExtras = async () => {
+      try {
+        // Load alerts
+        const alertsData = await dashboardService.getAlerts();
+        setAlerts(alertsData);
+
+        // Load KPIs if we have dashboard data
+        if (dashboardData) {
+          const kpisData = await dashboardService.getKPIs();
+          setKpis(kpisData);
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard extras:', error);
+      }
+    };
+
+    loadDashboardExtras();
+  }, [dashboardData]);
+
+  // Setup auto-refresh
+  useEffect(() => {
+    dashboardService.setupAutoRefresh(5); // 5 minutes
+    return () => dashboardService.stopAutoRefresh();
+  }, []);
+
+  // Handle manual refresh
+  const handleRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      dashboardService.clearCache();
+      
+      await Promise.all([
+        refetchDashboard(),
+        refetchOverview(),
+      ]);
+      
+      setLastRefresh(new Date());
+      toast.success('Dashboard refreshed successfully');
+    } catch (error) {
+      errorHandler.handleApiError(error, { context: 'dashboard_refresh' });
+      toast.error('Failed to refresh dashboard');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchDashboard, refetchOverview]);
+
+  // Handle alert dismissal
+  const handleDismissAlert = useCallback((alertId) => {
+    setAlerts(prev => prev.filter(alert => alert.id !== alertId));
+  }, []);
+
+  // Memoized summary cards data
+  const summaryCards = useMemo(() => {
+    if (!dashboardData || !overviewData) return [];
+
+    try {
+      const financialSummary = dashboardData.financialSummary;
+      const overview = overviewData;
+
+      return [
+        {
+          title: t('Total Revenue'),
+          value: formatCurrency(financialSummary?.current_month_performance?.revenue || 0),
+          icon: DollarSign,
+          color: 'green',
+          trend: kpis?.netIncome?.trend,
+          subtitle: 'This month'
+        },
+        {
+          title: t('Total Expenses'),
+          value: formatCurrency(financialSummary?.current_month_performance?.expenses || 0),
+          icon: TrendingDown,
+          color: 'red',
+          trend: kpis?.expenseRatio?.trend,
+          subtitle: 'This month'
+        },
+        {
+          title: t('Net Income'),
+          value: formatCurrency((financialSummary?.current_month_performance?.revenue || 0) - (financialSummary?.current_month_performance?.expenses || 0)),
+          icon: TrendingUp,
+          color: 'blue',
+          trend: kpis?.profitMargin?.trend,
+          subtitle: 'This month'
+        },
+        {
+          title: t('Active Projects'),
+          value: overview?.quick_stats?.total_projects || '0',
+          icon: Users,
+          color: 'purple',
+          subtitle: 'Currently running'
+        },
+      ];
+    } catch (error) {
+      console.error('Error preparing summary cards:', error);
+      return [];
+    }
+  }, [dashboardData, overviewData, kpis, t, formatCurrency]);
+
+  // Loading state
+  if (isDashboardLoading || isOverviewLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {t('dashboard')}
+          </h1>
+          <LoadingSpinner size="sm" />
+        </div>
+
+        {/* Loading skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <DashboardCard key={i} loading />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 h-80">
+            <LoadingSpinner size="md" message="Loading charts..." />
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 h-80">
+            <LoadingSpinner size="md" message="Loading data..." />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (dashboardError || overviewError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {t('dashboard')}
+          </h1>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="btn-secondary flex items-center"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {t('refresh')}
+          </button>
+        </div>
+
+        <ErrorMessage
+          message={dashboardError?.message || overviewError?.message || 'Failed to load dashboard data'}
+          onRetry={handleRefresh}
+          showRetry={true}
         />
       </div>
     );
@@ -318,225 +336,137 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Page Header */}
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl sm:truncate">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {t('dashboard')}
-          </h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Welcome back! Here's what's happening with your organization.
-          </p>
+          </h1>
+          {lastRefresh && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Last updated: {lastRefresh.toLocaleTimeString()}
+            </p>
+          )}
         </div>
-        <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
-          <select
-            value={selectedTimeframe}
-            onChange={(e) => setSelectedTimeframe(e.target.value)}
-            className="form-select text-sm"
-          >
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="quarter">This Quarter</option>
-            <option value="year">This Year</option>
-          </select>
-          <button className="btn-secondary text-sm">
-            <Calendar className="h-4 w-4 mr-2" />
-            Custom Range
-          </button>
-          <button className="btn-primary text-sm">
-            <FileText className="h-4 w-4 mr-2" />
-            New Entry
-          </button>
-        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="btn-secondary flex items-center"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : t('refresh')}
+        </button>
       </div>
 
-      {/* Enhanced Summary Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Alerts & Notifications
+          </h2>
+          <div className="space-y-3">
+            {alerts.map(alert => (
+              <AlertCard
+                key={alert.id}
+                alert={alert}
+                onDismiss={handleDismissAlert}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {summaryCards.map((card, index) => (
-          <SummaryCard key={index} {...card} />
+          <DashboardCard
+            key={index}
+            title={card.title}
+            value={card.value}
+            icon={card.icon}
+            color={card.color}
+            trend={card.trend}
+            subtitle={card.subtitle}
+          />
         ))}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activities */}
-        <div className="lg:col-span-2">
-          <div className="card">
-            <div className="card-header">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                  {t('recentEntries')}
-                </h3>
-                <button className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
-                  View All
-                </button>
-              </div>
-            </div>
-            <div className="card-body p-0">
-              {dashboardData?.recent_entries?.length > 0 ? (
-                <div className="space-y-1">
-                  {dashboardData.recent_entries.slice(0, 5).map((entry) => (
-                    <ActivityItem
-                      key={entry.id}
-                      activity={entry}
-                      formatDate={formatDate}
-                      formatCurrency={formatCurrency}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="p-8 text-center">
-                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {t('No recent entries')}
-                  </p>
-                  <button className="btn-primary mt-4 text-sm">
-                    Create First Entry
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="lg:col-span-1">
-          <div className="card">
-            <div className="card-header">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                Quick Actions
-              </h3>
-            </div>
-            <div className="card-body p-4">
-              <div className="grid grid-cols-1 gap-3">
-                {quickActions.map((action, index) => (
-                  <QuickAction
-                    key={index}
-                    icon={action.icon}
-                    title={action.title}
-                    description={action.description}
-                    onClick={action.action}
-                    color={action.color}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Enhanced Charts Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Financial Overview Chart */}
-        <div className="card">
-          <div className="card-header">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                Financial Overview
-              </h3>
-              <div className="flex items-center space-x-2">
-                <button className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                  <PieChart className="h-4 w-4" />
-                </button>
-                <button className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                  <BarChart3 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="card-body">
-            <Suspense fallback={<ChartFallback />}>
-              <FinancialChart 
-                data={dashboardData?.charts?.financial_overview} 
-                height={300}
-              />
-            </Suspense>
-          </div>
-        </div>
+        <FinancialChart
+          title="Financial Performance"
+          data={dashboardData?.charts?.revenue?.chart_data}
+          height={350}
+        />
 
-        {/* Revenue Trend Chart */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-              Revenue Trends
-            </h3>
-          </div>
-          <div className="card-body">
-            <Suspense fallback={<ChartFallback />}>
-              <RevenueChart 
-                data={dashboardData?.charts?.revenue_trends} 
-                height={300}
-              />
-            </Suspense>
-          </div>
-        </div>
+        {/* Revenue Breakdown Chart */}
+        <RevenueChart
+          title="Revenue Sources"
+          data={dashboardData?.charts?.revenue?.chart_data}
+          height={350}
+        />
       </div>
 
-      {/* Budget vs Actual Chart */}
-      <div className="card">
-        <div className="card-header">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-              Budget vs Actual Performance
-            </h3>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Variance: 
-                <span className="font-medium text-green-600 dark:text-green-400 ml-1">
-                  +5.2%
-                </span>
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="card-body">
-          <Suspense fallback={<ChartFallback />}>
-            <BudgetChart 
-              data={dashboardData?.charts?.budget_variance} 
-              height={400}
-            />
-          </Suspense>
-        </div>
+      {/* Additional Charts */}
+      <div className="grid grid-cols-1 gap-6">
+        <BudgetChart
+          title="Budget vs Actual Analysis"
+          data={dashboardData?.charts?.expenses?.chart_data}
+          height={400}
+        />
       </div>
 
-      {/* Performance Insights */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-          <div className="card-body">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 mr-3" />
-              <div>
-                <p className="text-blue-100">Revenue Growth</p>
-                <p className="text-2xl font-bold">+12.5%</p>
-                <p className="text-sm text-blue-100">vs last month</p>
-              </div>
+      {/* KPI Details */}
+      {kpis && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              Key Performance Indicators
+            </h3>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {Object.entries(kpis).map(([key, kpi]) => (
+                <div key={key} className="text-center">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {kpi.formatted}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </div>
+                  {kpi.trend && (
+                    <div className={`text-xs mt-1 ${
+                      kpi.trend.direction === 'up' ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {kpi.trend.direction === 'up' ? '↗' : '↘'} {kpi.trend.percentage}%
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
+      )}
 
-        <div className="card bg-gradient-to-r from-green-500 to-green-600 text-white">
-          <div className="card-body">
-            <div className="flex items-center">
-              <CheckCircle className="h-8 w-8 mr-3" />
-              <div>
-                <p className="text-green-100">Budget Efficiency</p>
-                <p className="text-2xl font-bold">94.3%</p>
-                <p className="text-sm text-green-100">of planned spend</p>
-              </div>
-            </div>
-          </div>
+      {/* Quick Actions */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            Quick Actions
+          </h3>
         </div>
-
-        <div className="card bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-          <div className="card-body">
-            <div className="flex items-center">
-              <Users className="h-8 w-8 mr-3" />
-              <div>
-                <p className="text-purple-100">Active Grants</p>
-                <p className="text-2xl font-bold">{dashboardData?.metrics?.active_grants || 8}</p>
-                <p className="text-sm text-purple-100">funding projects</p>
-              </div>
-            </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button className="btn-primary w-full">
+              Create Journal Entry
+            </button>
+            <button className="btn-secondary w-full">
+              Generate Report
+            </button>
+            <button className="btn-secondary w-full">
+              Export Dashboard
+            </button>
           </div>
         </div>
       </div>
