@@ -1,5 +1,4 @@
-
-// frontend/src/components/ErrorBoundary.jsx
+// frontend/src/components/ErrorBoundary.jsx - Fixed version
 
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
 import React from 'react';
@@ -16,16 +15,17 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
     // Generate error ID for reporting
     const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // FIXED: Ensure errorInfo is properly set
     this.setState({
       error,
-      errorInfo,
+      errorInfo: errorInfo || { componentStack: 'Not available' },
       errorId
     });
 
@@ -37,8 +37,8 @@ class ErrorBoundary extends React.Component {
     // In production, send to error tracking service
     console.error('Error Boundary caught an error:', {
       errorId,
-      error: error.toString(),
-      errorInfo: errorInfo.componentStack,
+      error: error ? error.toString() : 'Unknown error',
+      errorInfo: errorInfo ? errorInfo.componentStack : 'Component stack not available',
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
       url: window.location.href
@@ -46,7 +46,12 @@ class ErrorBoundary extends React.Component {
   };
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
+    this.setState({ 
+      hasError: false, 
+      error: null, 
+      errorInfo: null,
+      errorId: null 
+    });
   };
 
   render() {
@@ -64,14 +69,20 @@ class ErrorBoundary extends React.Component {
                   We're sorry, but something unexpected happened.
                 </p>
                 
-                {process.env.NODE_ENV === 'development' && (
+                {process.env.NODE_ENV === 'development' && this.state.error && (
                   <details className="mt-4 text-left">
                     <summary className="cursor-pointer text-sm text-gray-500">
                       Error Details (Development Only)
                     </summary>
-                    <pre className="mt-2 text-xs text-red-600 whitespace-pre-wrap">
-                      {this.state.error && this.state.error.toString()}
-                      {this.state.errorInfo.componentStack}
+                    <pre className="mt-2 text-xs text-red-600 whitespace-pre-wrap bg-gray-100 p-2 rounded">
+                      {this.state.error.toString()}
+                      {/* FIXED: Safe access to componentStack */}
+                      {this.state.errorInfo && this.state.errorInfo.componentStack && (
+                        <div className="mt-2">
+                          Component Stack:
+                          {this.state.errorInfo.componentStack}
+                        </div>
+                      )}
                     </pre>
                   </details>
                 )}

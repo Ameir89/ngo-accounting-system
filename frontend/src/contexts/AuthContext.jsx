@@ -1,4 +1,4 @@
-// frontend/src/contexts/AuthContext.jsx - Enhanced with better state management
+// frontend/src/contexts/AuthContext.jsx - Enhanced with better error handling
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { authService } from '../services/auth';
 
@@ -83,36 +83,54 @@ export const AuthProvider = ({ children }) => {
   // Setup auto-logout and refresh intervals
   useEffect(() => {
     if (isInitialized && user) {
-      // Setup auto-logout for session timeout
-      autoLogoutCleanupRef.current = authService.setupAutoLogout(30); // 30 minutes
-
-      // Setup periodic token validation (every 5 minutes)
-      refreshIntervalRef.current = setInterval(() => {
-        if (authService.isAuthenticated() && authService.isTokenValid()) {
-          // Token is still valid, optionally refresh user data
-          authService.refreshUserData().catch(error => {
-            console.warn('Background user data refresh failed:', error);
-            if (error.response?.status === 401) {
-              handleLogout('token_expired');
-            }
-          });
+      try {
+        // FIXED: Check if setupAutoLogout exists before calling it
+        if (authService.setupAutoLogout && typeof authService.setupAutoLogout === 'function') {
+          autoLogoutCleanupRef.current = authService.setupAutoLogout(30); // 30 minutes
         } else {
-          // Token is invalid, logout user
-          handleLogout('token_invalid');
+          console.warn('⚠️ setupAutoLogout method not available in authService');
         }
-      }, 5 * 60 * 1000); // 5 minutes
 
-      return () => {
-        // Cleanup
-        if (autoLogoutCleanupRef.current) {
-          autoLogoutCleanupRef.current();
-          autoLogoutCleanupRef.current = null;
-        }
-        if (refreshIntervalRef.current) {
-          clearInterval(refreshIntervalRef.current);
-          refreshIntervalRef.current = null;
-        }
-      };
+        // Setup periodic token validation (every 5 minutes)
+        refreshIntervalRef.current = setInterval(() => {
+          try {
+            if (authService.isAuthenticated() && authService.isTokenValid()) {
+              // Token is still valid, optionally refresh user data
+              authService.refreshUserData().catch(error => {
+                console.warn('Background user data refresh failed:', error);
+                if (error.response?.status === 401) {
+                  handleLogout('token_expired');
+                }
+              });
+            } else {
+              // Token is invalid, logout user
+              handleLogout('token_invalid');
+            }
+          } catch (error) {
+            console.warn('Token validation error:', error);
+          }
+        }, 5 * 60 * 1000); // 5 minutes
+
+        return () => {
+          // Cleanup
+          try {
+            if (autoLogoutCleanupRef.current && typeof autoLogoutCleanupRef.current === 'function') {
+              autoLogoutCleanupRef.current();
+              autoLogoutCleanupRef.current = null;
+            }
+          } catch (error) {
+            console.warn('Error during auto-logout cleanup:', error);
+          }
+          
+          if (refreshIntervalRef.current) {
+            clearInterval(refreshIntervalRef.current);
+            refreshIntervalRef.current = null;
+          }
+        };
+      } catch (error) {
+        console.error('Error setting up auth monitoring:', error);
+        setError('Failed to setup authentication monitoring');
+      }
     }
   }, [isInitialized, user]);
 
@@ -143,10 +161,15 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       
       // Cleanup intervals
-      if (autoLogoutCleanupRef.current) {
-        autoLogoutCleanupRef.current();
-        autoLogoutCleanupRef.current = null;
+      try {
+        if (autoLogoutCleanupRef.current && typeof autoLogoutCleanupRef.current === 'function') {
+          autoLogoutCleanupRef.current();
+          autoLogoutCleanupRef.current = null;
+        }
+      } catch (error) {
+        console.warn('Error during logout cleanup:', error);
       }
+      
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
         refreshIntervalRef.current = null;
@@ -181,7 +204,12 @@ export const AuthProvider = ({ children }) => {
 
   // Permission check function
   const hasPermission = useCallback((permission) => {
-    return authService.hasPermission(permission, user);
+    try {
+      return authService.hasPermission(permission, user);
+    } catch (error) {
+      console.error('Permission check error:', error);
+      return false;
+    }
   }, [user]);
 
   // Change password function
@@ -225,7 +253,12 @@ export const AuthProvider = ({ children }) => {
 
   // Get security events function
   const getSecurityEvents = useCallback((limit = 50) => {
-    return authService.getSecurityEvents(limit);
+    try {
+      return authService.getSecurityEvents ? authService.getSecurityEvents(limit) : [];
+    } catch (error) {
+      console.error('Failed to get security events:', error);
+      return [];
+    }
   }, []);
 
   // Refresh user data function
@@ -345,22 +378,32 @@ export const useAuth = () => {
 export const ProtectedComponent = ({ permission, fallback = null, children }) => {
   const { hasPermission } = useAuth();
   
-  if (!hasPermission(permission)) {
+  try {
+    if (!hasPermission(permission)) {
+      return fallback;
+    }
+    
+    return children;
+  } catch (error) {
+    console.error('ProtectedComponent error:', error);
     return fallback;
   }
-  
-  return children;
 };
 
 // Role-based component wrapper
 export const RoleProtectedComponent = ({ allowedRoles = [], fallback = null, children }) => {
   const { user } = useAuth();
   
-  if (!user || !allowedRoles.includes(user.role_name)) {
+  try {
+    if (!user || !allowedRoles.includes(user.role_name)) {
+      return fallback;
+    }
+    
+    return children;
+  } catch (error) {
+    console.error('RoleProtectedComponent error:', error);
     return fallback;
   }
-  
-  return children;
 };
 
 export default AuthContext;

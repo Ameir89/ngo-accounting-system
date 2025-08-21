@@ -1,4 +1,4 @@
-// frontend/src/services/auth.js - Enhanced Auth Service
+// frontend/src/services/auth.js - Fixed with missing setupAutoLogout method
 import { apiService, tokenUtils } from './api';
 
 // Enhanced authentication service that works with the new token refresh system
@@ -187,6 +187,67 @@ export const authService = {
       console.error('❌ Error updating user data:', error);
       return false;
     }
+  },
+
+  /**
+   * Setup automatic logout after inactivity - FIXED: Added missing method
+   */
+  setupAutoLogout: (timeoutMinutes = 30) => {
+    let timeoutId;
+    let warningTimeoutId;
+    const timeoutMs = timeoutMinutes * 60 * 1000;
+    const warningMs = timeoutMs - (5 * 60 * 1000); // 5 minutes before logout
+
+    const resetTimer = () => {
+      // Clear existing timeouts
+      if (timeoutId) clearTimeout(timeoutId);
+      if (warningTimeoutId) clearTimeout(warningTimeoutId);
+
+      // Set warning timer (5 minutes before logout)
+      warningTimeoutId = setTimeout(() => {
+        console.warn('⚠️ Session will expire in 5 minutes due to inactivity');
+        // You could show a warning modal here
+        window.dispatchEvent(new CustomEvent('auth:warning', { 
+          detail: { timeLeft: 5 * 60 * 1000 }
+        }));
+      }, warningMs);
+
+      // Set logout timer
+      timeoutId = setTimeout(() => {
+        console.log('🕐 Auto-logout triggered due to inactivity');
+        authService.logout('inactivity_timeout').then(() => {
+          window.dispatchEvent(new CustomEvent('auth:logout', { 
+            detail: { reason: 'inactivity_timeout' }
+          }));
+        });
+      }, timeoutMs);
+    };
+
+    // Activity events to reset timer
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    // Reset timer on activity
+    const handleActivity = () => {
+      resetTimer();
+    };
+
+    // Add event listeners
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    // Start the timer
+    resetTimer();
+
+    // Return cleanup function
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (warningTimeoutId) clearTimeout(warningTimeoutId);
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+      console.log('🛑 Auto-logout monitoring stopped');
+    };
   },
 
   /**
