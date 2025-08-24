@@ -60,7 +60,7 @@ def login():
     
     # Find user
     user = User.query.filter_by(username=data['username']).first()
-    
+    print("test ameir ", user.id)
     if not user or not check_password_hash(user.password, data['password']) or not user.is_active:
         # Record failed attempt
         if client_ip not in failed_attempts:
@@ -121,12 +121,12 @@ def login():
     }
     
     access_token = create_access_token(
-        identity=user.id, 
+        identity=str(user.id), 
         additional_claims=additional_claims,
         expires_delta=timedelta(hours=8)
     )
     refresh_token = create_refresh_token(
-        identity=user.id,
+        identity=str(user.id),
         expires_delta=timedelta(days=30)
     )
     

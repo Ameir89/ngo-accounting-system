@@ -87,15 +87,35 @@ def create_app(config_name=None):
     # JWT error handlers
     @jwt.expired_token_loader
     def expired_token_callback(jwt_header, jwt_payload):
+        app.logger.warning(f"JWT expired: header={jwt_header}, payload={jwt_payload}")
         return jsonify({'message': 'Token has expired'}), 401
-    
+
     @jwt.invalid_token_loader
     def invalid_token_callback(error):
-        return jsonify({'message': 'Invalid token'}), 401
-    
+        app.logger.error(f"JWT invalid: {error}")
+        return jsonify({'message': 'Invalid token', 'error': error}), 401
+
     @jwt.unauthorized_loader
     def missing_token_callback(error):
-        return jsonify({'message': 'Authorization token required'}), 401
+        app.logger.error(f"JWT unauthorized (missing/invalid header): {error}")
+        return jsonify({'message': 'Authorization token required', 'error': error}), 401
+
+    @jwt.revoked_token_loader
+    def revoked_token_callback(jwt_header, jwt_payload):
+        app.logger.warning(f"JWT revoked: header={jwt_header}, payload={jwt_payload}")
+        return jsonify({'message': 'Token has been revoked'}), 401
+    # # JWT error handlers
+    # @jwt.expired_token_loader
+    # def expired_token_callback(jwt_header, jwt_payload):
+    #     return jsonify({'message': 'Token has expired'}), 401
+    
+    # @jwt.invalid_token_loader
+    # def invalid_token_callback(error):
+    #     return jsonify({'message': 'Invalid token'}), 401
+    
+    # @jwt.unauthorized_loader
+    # def missing_token_callback(error):
+    #     return jsonify({'message': 'Authorization token required'}), 401
     
     # # Handle OPTIONS requests for all routes
     # @app.before_request
