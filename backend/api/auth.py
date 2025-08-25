@@ -11,8 +11,8 @@ import pyotp
 import qrcode
 import io
 import base64
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import smtplib
 import json
 import ipaddress
@@ -645,7 +645,7 @@ def send_password_change_notification(email, first_name):
             current_app.logger.warning("Email configuration incomplete")
             return False
         
-        msg = MimeMultipart()
+        msg = MIMEMultipart()
         msg['From'] = smtp_config['username']
         msg['To'] = email
         msg['Subject'] = f'{current_app.config.get("ORG_NAME", "NGO Accounting")} - Password Changed'
@@ -665,7 +665,7 @@ def send_password_change_notification(email, first_name):
         {current_app.config.get('ORG_NAME', 'NGO Accounting')} Security Team
         """
         
-        msg.attach(MimeText(body, 'plain'))
+        msg.attach(MIMEText(body, 'plain'))
         
         server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
         server.starttls()
@@ -693,7 +693,7 @@ def send_password_reset_email(email, first_name, reset_token):
         
         reset_url = f"{current_app.config.get('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token={reset_token}"
         
-        msg = MimeMultipart()
+        msg = MIMEMultipart()
         msg['From'] = smtp_config['username']
         msg['To'] = email
         msg['Subject'] = f'{current_app.config.get("ORG_NAME", "NGO Accounting")} - Password Reset'
@@ -714,7 +714,7 @@ def send_password_reset_email(email, first_name, reset_token):
         {current_app.config.get('ORG_NAME', 'NGO Accounting')} Team
         """
         
-        msg.attach(MimeText(body, 'plain'))
+        msg.attach(MIMEText(body, 'plain'))
         
         server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
         server.starttls()
@@ -739,8 +739,8 @@ def send_password_reset_confirmation(email, first_name):
         
         if not all(smtp_config.values()):
             return False
-        
-        msg = MimeMultipart()
+
+        msg = MIMEMultipart()
         msg['From'] = smtp_config['username']
         msg['To'] = email
         msg['Subject'] = f'{current_app.config.get("ORG_NAME", "NGO Accounting")} - Password Reset Completed'
@@ -762,7 +762,7 @@ def send_password_reset_confirmation(email, first_name):
         {current_app.config.get('ORG_NAME', 'NGO Accounting')} Security Team
         """
         
-        msg.attach(MimeText(body, 'plain'))
+        msg.attach(MIMEText(body, 'plain'))
         
         server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
         server.starttls()

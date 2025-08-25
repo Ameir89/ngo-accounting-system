@@ -78,6 +78,14 @@
 /* ===== BASE STYLES ===== */
 
 /* Enhanced font loading with better fallbacks */
+/* @font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter.woff2') format('woff2'),
+       url('/fonts/Inter.woff') format('woff');
+  font-weight: 300 700;
+  font-style: normal;
+} */
+
 @font-face {
   font-family: 'Inter';
   font-style: normal;

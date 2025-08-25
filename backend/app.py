@@ -136,7 +136,7 @@ def create_app(config_name=None):
     # Register blueprints with version prefix
     api_prefix = '/api/v1'
     
-    app.register_blueprint(auth_bp, url_prefix=api_prefix)
+    app.register_blueprint(auth_bp, url_prefix=api_prefix + '/auth')
     app.register_blueprint(accounts_bp, url_prefix=api_prefix + '/accounts')
     app.register_blueprint(journals_bp, url_prefix=api_prefix + '/journal-entries')
     app.register_blueprint(reports_bp, url_prefix=api_prefix + '/reports')
