@@ -4,7 +4,13 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Navigation from './Navigation';
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen, isRTL }) => {
+  // const { t } = useLanguage();
   const { t } = useLanguage();
+
+  const handleItemClick = () => {
+    // Close mobile sidebar when item is clicked
+    setSidebarOpen(false);
+  };
 
   return (
     <>

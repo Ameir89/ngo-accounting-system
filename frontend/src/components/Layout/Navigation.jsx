@@ -322,7 +322,7 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
           name: t('costCenters'),
           href: '/cost-centers',
           icon: Target,
-          permission: 'cost_center_read',
+          permission: 'journal_read',
           description: 'Organize expenses by department',
           badge: null,
         },
