@@ -20,12 +20,13 @@ def get_accounts():
     search = request.args.get('search')
     
     query = Account.query
-    
+    print(Account.account_type)
+    # filter by account_type only if provided
     if account_type:
-        try:
-            enum_type = AccountType(account_type.upper())  # normalize to uppercase
-            query = query.filter(Account.account_type == enum_type)
-        except ValueError:
+        account_type_upper = account_type.upper()
+        if account_type_upper:
+            query = query.filter(Account.account_type == account_type_upper)
+        else:
             return jsonify({'message': f'Invalid account_type: {account_type}'}), 400
     # if account_type:
     #     query = query.filter(Account.account_type == account_type)

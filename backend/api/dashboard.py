@@ -1,4 +1,5 @@
 # backend/api/dashboard.py - Dashboard Analytics API
+from venv import logger
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from datetime import datetime, date, timedelta
@@ -16,37 +17,78 @@ dashboard_bp = Blueprint('dashboard', __name__)
 @check_permission('dashboard_read')
 def get_dashboard_overview():
     """Get comprehensive dashboard overview"""
-    # Get date range (default to current month)
-    end_date = request.args.get('end_date')
-    start_date = request.args.get('start_date')
+    try:
+        # Get date range (default to current month)
+        end_date_str = request.args.get('end_date')
+        start_date_str = request.args.get('start_date')
+
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else date.today()
+        except ValueError:
+            return jsonify({'message': f'Invalid end_date format. Use YYYY-MM-DD.'}), 400
+
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else end_date.replace(day=1)
+        except ValueError:
+            return jsonify({'message': f'Invalid start_date format. Use YYYY-MM-DD.'}), 400
+
+        # Use analytics service for comprehensive data
+        analytics = AdvancedAnalyticsService()
+        dashboard_data = analytics.get_financial_dashboard_data(start_date, end_date)
+
+        # Add quick stats (safe since we use enums directly)
+        quick_stats = {
+            'total_accounts': Account.query.filter_by(is_active=True).count(),
+            'total_projects': Project.query.filter_by(is_active=True).count(),
+            'active_grants': Grant.query.filter_by(status=GrantStatus.ACTIVE).count(),
+            'total_suppliers': Supplier.query.filter_by(is_active=True).count(),
+            'total_assets': FixedAsset.query.filter_by(is_active=True).count(),
+            'total_users': User.query.filter_by(is_active=True).count()
+        }
+
+        dashboard_data['quick_stats'] = quick_stats
+        return jsonify(dashboard_data)
+
+    except Exception as e:
+        # Log for debugging
+        logger.error(f"Dashboard overview error: {str(e)}", exc_info=True)
+        return jsonify({'message': 'Failed to generate dashboard overview', 'error': str(e)}), 500
+
+# @dashboard_bp.route('/overview', methods=['GET'])
+# @check_permission('dashboard_read')
+# def get_dashboard_overview():
+#     """Get comprehensive dashboard overview"""
+#     # Get date range (default to current month)
+#     end_date = request.args.get('end_date')
+#     start_date = request.args.get('start_date')
     
-    if not end_date:
-        end_date = date.today()
-    else:
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+#     if not end_date:
+#         end_date = date.today()
+#     else:
+#         end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
     
-    if not start_date:
-        start_date = end_date.replace(day=1)  # First day of month
-    else:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+#     if not start_date:
+#         start_date = end_date.replace(day=1)  # First day of month
+#     else:
+#         start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
     
-    # Use analytics service for comprehensive data
-    analytics = AdvancedAnalyticsService()
-    dashboard_data = analytics.get_financial_dashboard_data(start_date, end_date)
+#     # Use analytics service for comprehensive data
+#     analytics = AdvancedAnalyticsService()
+#     dashboard_data = analytics.get_financial_dashboard_data(start_date, end_date)
     
-    # Add quick stats
-    quick_stats = {
-        'total_accounts': Account.query.filter_by(is_active=True).count(),
-        'total_projects': Project.query.filter_by(is_active=True).count(),
-        'active_grants': Grant.query.filter_by(status=GrantStatus.ACTIVE).count(),
-        'total_suppliers': Supplier.query.filter_by(is_active=True).count(),
-        'total_assets': FixedAsset.query.filter_by(is_active=True).count(),
-        'total_users': User.query.filter_by(is_active=True).count()
-    }
+#     # Add quick stats
+#     quick_stats = {
+#         'total_accounts': Account.query.filter_by(is_active=True).count(),
+#         'total_projects': Project.query.filter_by(is_active=True).count(),
+#         'active_grants': Grant.query.filter_by(status=GrantStatus.ACTIVE).count(),
+#         'total_suppliers': Supplier.query.filter_by(is_active=True).count(),
+#         'total_assets': FixedAsset.query.filter_by(is_active=True).count(),
+#         'total_users': User.query.filter_by(is_active=True).count()
+#     }
     
-    dashboard_data['quick_stats'] = quick_stats
+#     dashboard_data['quick_stats'] = quick_stats
     
-    return jsonify(dashboard_data)
+#     return jsonify(dashboard_data)
 
 @dashboard_bp.route('/financial-summary', methods=['GET'])
 @check_permission('dashboard_read')

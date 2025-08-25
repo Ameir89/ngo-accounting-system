@@ -566,9 +566,32 @@ export const apiService = {
   dashboard: {
     getOverview: (params = {}) => api.get('/dashboard/overview', { params }),
     getFinancialSummary: (params = {}) => api.get('/dashboard/financial-summary', { params }),
-    getSummary: (params = {}) => api.get('/dashboard/summary', { params }),
+    // getSummary: (params = {}) => api.get('/dashboard/summary', { params }),
     getRevenueChart: (params = {}) => api.get('/dashboard/charts/revenue-trend', { params }),
     getExpenseChart: (params = {}) => api.get('/dashboard/charts/expense-breakdown', { params }),
+    
+       // New comprehensive method for dashboard data
+    getComprehensiveData: async (params = {}) => {
+      try {
+        const [overview, financialSummary, revenueChart, expenseChart] = await Promise.allSettled([
+          api.get('/dashboard/overview', { params }),
+          api.get('/dashboard/financial-summary', { params }),
+          api.get('/dashboard/charts/revenue-trend', { params }),
+          api.get('/dashboard/charts/expense-breakdown', { params }),
+        ]);
+
+        return {
+          overview: overview.status === 'fulfilled' ? overview.value.data : null,
+          financialSummary: financialSummary.status === 'fulfilled' ? financialSummary.value.data : null,
+          revenueChart: revenueChart.status === 'fulfilled' ? revenueChart.value.data : null,
+          expenseChart: expenseChart.status === 'fulfilled' ? expenseChart.value.data : null,
+        };
+      } catch (error) {
+        console.error('Failed to fetch comprehensive dashboard data:', error);
+        throw error;
+      }
+    },
+
   },
 
   // Other endpoints... (keep existing ones)

@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 from sqlalchemy import func, extract, and_, or_, case
 from models import (
-    db, Account, JournalEntry, JournalEntryLine, AccountType, 
+    GrantStatus, db, Account, JournalEntry, JournalEntryLine, AccountType, 
     Grant, Project, Donor, Budget, BudgetLine, FixedAsset
 )
 import json
@@ -34,7 +34,8 @@ class AdvancedAnalyticsService:
         grant_data = AdvancedAnalyticsService._get_grant_utilization()
         
         # Project performance
-        project_data = AdvancedAnalyticsService._get_project_performance(start_date, end_date)
+        # project_data = AdvancedAnalyticsService._get_project_performance(start_date, end_date)
+        project_data = None
         
         # Key performance indicators
         kpis = AdvancedAnalyticsService._calculate_kpis(start_date, end_date)
@@ -269,7 +270,7 @@ class AdvancedAnalyticsService:
     @staticmethod
     def _get_grant_utilization():
         """Analyze grant utilization across all active grants"""
-        grants = Grant.query.filter_by(status='active').all()
+        grants = Grant.query.filter_by(status=GrantStatus.ACTIVE).all()
         
         grant_analysis = []
         total_grant_amount = Decimal('0')
@@ -417,7 +418,7 @@ class AdvancedAnalyticsService:
         expiring_grants = Grant.query.filter(
             and_(
                 Grant.end_date <= warning_date,
-                Grant.status == 'active'
+                Grant.status == GrantStatus.ACTIVE
             )
         ).count()
         
