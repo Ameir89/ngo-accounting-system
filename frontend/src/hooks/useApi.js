@@ -1,4 +1,4 @@
-// frontend/src/hooks/useApi.js - Fixed all API call issues
+// frontend/src/hooks/useApi.js - Fixed with missing project hooks
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { apiService } from "../services/api";
@@ -508,12 +508,68 @@ export const useDeleteCostCenter = () => {
   });
 };
 
+// ===== PROJECTS HOOKS - FIXED: Added missing project hooks =====
 export const useProjects = (params = {}) => {
   return useQuery({
     queryKey: ["projects", params],
     queryFn: () => apiService.projects.getAll(params),
     select: (data) => data.data,
     staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useProject = (id) => {
+  return useQuery({
+    queryKey: ["projects", id],
+    queryFn: () => apiService.projects.getById(id),
+    select: (data) => data.data,
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useCreateProject = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => apiService.projects.create(data),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Project created successfully");
+      return response.data;
+    },
+    onError: (error) => handleMutationError(error, "Failed to create project"),
+  });
+};
+
+export const useUpdateProject = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => apiService.projects.update(id, data),
+    onSuccess: (response, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["projects", id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Project updated successfully");
+      return response.data;
+    },
+    onError: (error) => handleMutationError(error, "Failed to update project"),
+  });
+};
+
+export const useDeleteProject = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => apiService.projects.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Project deleted successfully");
+    },
+    onError: (error) => handleMutationError(error, "Failed to delete project"),
   });
 };
 
@@ -669,10 +725,14 @@ export const apiHooks = {
   // Cost Centers & Projects
   useCostCenters,
   useCostCenter,
-  useCreateCostCenter, // FIXED: Added missing hook
-  useUpdateCostCenter, // FIXED: Added missing hook
-  useDeleteCostCenter, // FIXED: Added missing hook
+  useCreateCostCenter,
+  useUpdateCostCenter,
+  useDeleteCostCenter,
   useProjects,
+  useProject, // Added missing hook
+  useCreateProject, // FIXED: Added missing hook
+  useUpdateProject, // FIXED: Added missing hook
+  useDeleteProject, // FIXED: Added missing hook
   useProjectExpenses,
 
   // Budgets

@@ -1,30 +1,48 @@
 // frontend/src/pages/Projects.jsx
 import {
-    BarChart3,
-    CheckCircle, Clock, Edit, Eye,
-    FolderOpen, Plus, Search, Target,
-    Users, XCircle
-} from 'lucide-react';
-import { useState } from 'react';
-import toast from 'react-hot-toast';
-import ErrorMessage from '../components/UI/ErrorMessage';
-import LoadingSpinner from '../components/UI/LoadingSpinner';
-import Modal from '../components/UI/Modal';
-import { useLanguage } from '../contexts/LanguageContext';
-import { useCreateProject, useDeleteProject, useProjects, useUpdateProject } from '../hooks/useApi';
+  BarChart3,
+  CheckCircle,
+  Clock,
+  Edit,
+  Eye,
+  FolderOpen,
+  Plus,
+  Search,
+  Target,
+  Users,
+  XCircle,
+} from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
+import ErrorMessage from "../components/UI/ErrorMessage";
+import LoadingSpinner from "../components/UI/LoadingSpinner";
+import Modal from "../components/UI/Modal";
+import { useLanguage } from "../contexts/LanguageContext";
+import {
+  useCreateProject,
+  useDeleteProject,
+  useProjects,
+  useUpdateProject,
+  useCostCenters,
+} from "../hooks/useApi";
 
 const Projects = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
-  
-  const { t, formatCurrency, formatDate } = useLanguage();
-  
-  const { data: projectsData, isLoading, error, refetch } = useProjects({
+
+  const { t, formatCurrency } = useLanguage();
+
+  const {
+    data: projectsData,
+    isLoading,
+    error,
+    refetch,
+  } = useProjects({
     search: searchTerm,
     status: statusFilter,
     page: currentPage,
@@ -39,31 +57,31 @@ const Projects = () => {
   const pagination = projectsData?.pagination || {};
 
   const statusOptions = [
-    { value: '', label: 'All Statuses' },
-    { value: 'planning', label: 'Planning' },
-    { value: 'active', label: 'Active' },
-    { value: 'on_hold', label: 'On Hold' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'cancelled', label: 'Cancelled' },
+    { value: "", label: "All Statuses" },
+    { value: "planning", label: "Planning" },
+    { value: "active", label: "Active" },
+    { value: "on_hold", label: "On Hold" },
+    { value: "completed", label: "Completed" },
+    { value: "cancelled", label: "Cancelled" },
   ];
 
   const handleSubmit = async (projectData) => {
     try {
       if (editingProject) {
-        await updateProjectMutation.mutateAsync({ 
-          id: editingProject.id, 
-          data: projectData 
+        await updateProjectMutation.mutateAsync({
+          id: editingProject.id,
+          data: projectData,
         });
-        toast.success('Project updated successfully');
+        toast.success("Project updated successfully");
       } else {
         await createProjectMutation.mutateAsync(projectData);
-        toast.success('Project created successfully');
+        toast.success("Project created successfully");
       }
       setShowForm(false);
       setEditingProject(null);
       refetch();
     } catch (error) {
-      toast.error(error.message || 'Operation failed');
+      toast.error(error.message || "Operation failed");
     }
   };
 
@@ -145,7 +163,7 @@ const Projects = () => {
                 />
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Status
@@ -174,12 +192,12 @@ const Projects = () => {
                 <option value="low">Low</option>
               </select>
             </div>
-            
+
             <div className="flex items-end">
               <button
                 onClick={() => {
-                  setSearchTerm('');
-                  setStatusFilter('');
+                  setSearchTerm("");
+                  setStatusFilter("");
                 }}
                 className="btn-secondary"
               >
@@ -210,7 +228,7 @@ const Projects = () => {
           setShowForm(false);
           setEditingProject(null);
         }}
-        title={editingProject ? 'Edit Project' : 'Create New Project'}
+        title={editingProject ? "Edit Project" : "Create New Project"}
         size="xl"
       >
         <ProjectForm
@@ -219,7 +237,9 @@ const Projects = () => {
             setShowForm(false);
             setEditingProject(null);
           }}
-          loading={createProjectMutation.isLoading || updateProjectMutation.isLoading}
+          loading={
+            createProjectMutation.isLoading || updateProjectMutation.isLoading
+          }
           editData={editingProject}
         />
       </Modal>
@@ -228,7 +248,7 @@ const Projects = () => {
       <Modal
         isOpen={showDetails}
         onClose={() => setShowDetails(false)}
-        title={`Project Details - ${selectedProject?.name || ''}`}
+        title={`Project Details - ${selectedProject?.name || ""}`}
         size="xl"
       >
         {selectedProject && (
@@ -302,16 +322,16 @@ const ProjectsGrid = ({ projects, onView, onEdit }) => {
 // Project Card Component
 const ProjectCard = ({ project, onView, onEdit }) => {
   const { formatCurrency, formatDate } = useLanguage();
-  
+
   const getStatusColor = (status) => {
     const colors = {
-      planning: 'badge-warning',
-      active: 'badge-success',
-      on_hold: 'badge-warning',
-      completed: 'badge-info',
-      cancelled: 'badge-danger',
+      planning: "badge-warning",
+      active: "badge-success",
+      on_hold: "badge-warning",
+      completed: "badge-info",
+      cancelled: "badge-danger",
     };
-    return colors[status] || 'badge-info';
+    return colors[status] || "badge-info";
   };
 
   const getStatusIcon = (status) => {
@@ -327,11 +347,11 @@ const ProjectCard = ({ project, onView, onEdit }) => {
 
   const getPriorityColor = (priority) => {
     const colors = {
-      high: 'text-red-600',
-      medium: 'text-yellow-600',
-      low: 'text-green-600',
+      high: "text-red-600",
+      medium: "text-yellow-600",
+      low: "text-green-600",
     };
-    return colors[priority] || 'text-gray-600';
+    return colors[priority] || "text-gray-600";
   };
 
   const StatusIcon = getStatusIcon(project.status);
@@ -351,16 +371,20 @@ const ProjectCard = ({ project, onView, onEdit }) => {
             </p>
           </div>
           <div className="flex items-center space-x-2">
-            <span className={`badge ${getStatusColor(project.status)} flex items-center`}>
+            <span
+              className={`badge ${getStatusColor(
+                project.status
+              )} flex items-center`}
+            >
               <StatusIcon className="h-3 w-3 mr-1" />
-              {project.status.replace('_', ' ')}
+              {project.status.replace("_", " ")}
             </span>
           </div>
         </div>
 
         {/* Description */}
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
-          {project.description || 'No description available'}
+          {project.description || "No description available"}
         </p>
 
         {/* Progress */}
@@ -370,7 +394,7 @@ const ProjectCard = ({ project, onView, onEdit }) => {
             <span className="font-medium">{project.progress || 0}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
+            <div
               className="bg-blue-500 h-2 rounded-full"
               style={{ width: `${project.progress || 0}%` }}
             ></div>
@@ -380,14 +404,19 @@ const ProjectCard = ({ project, onView, onEdit }) => {
         {/* Budget */}
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-gray-700 dark:text-gray-300">Budget Used</span>
+            <span className="text-gray-700 dark:text-gray-300">
+              Budget Used
+            </span>
             <span className="font-medium">{budgetUsed.toFixed(1)}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
+            <div
               className={`h-2 rounded-full ${
-                budgetUsed >= 90 ? 'bg-red-500' : 
-                budgetUsed >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                budgetUsed >= 90
+                  ? "bg-red-500"
+                  : budgetUsed >= 75
+                  ? "bg-yellow-500"
+                  : "bg-green-500"
               }`}
               style={{ width: `${Math.min(budgetUsed, 100)}%` }}
             ></div>
@@ -414,8 +443,12 @@ const ProjectCard = ({ project, onView, onEdit }) => {
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-500">Priority</span>
-            <span className={`font-medium capitalize ${getPriorityColor(project.priority)}`}>
-              {project.priority || 'medium'}
+            <span
+              className={`font-medium capitalize ${getPriorityColor(
+                project.priority
+              )}`}
+            >
+              {project.priority || "medium"}
             </span>
           </div>
         </div>
@@ -427,7 +460,7 @@ const ProjectCard = ({ project, onView, onEdit }) => {
             <span>{project.team_size || 0} members</span>
           </div>
           <div className="text-sm text-gray-500">
-            Manager: {project.manager_name || 'Not assigned'}
+            Manager: {project.manager_name || "Not assigned"}
           </div>
         </div>
 
@@ -456,36 +489,47 @@ const ProjectCard = ({ project, onView, onEdit }) => {
 // Project Form Component
 const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
   const [formData, setFormData] = useState({
-    code: editData?.code || '',
-    name: editData?.name || '',
-    description: editData?.description || '',
-    status: editData?.status || 'planning',
-    priority: editData?.priority || 'medium',
-    start_date: editData?.start_date || '',
-    end_date: editData?.end_date || '',
-    total_budget: editData?.total_budget || '',
-    manager_id: editData?.manager_id || '',
-    cost_center_id: editData?.cost_center_id || '',
+    code: editData?.code || "",
+    name: editData?.name || "",
+    description: editData?.description || "",
+    status: editData?.status || "planning",
+    priority: editData?.priority || "medium",
+    start_date: editData?.start_date || "",
+    end_date: editData?.end_date || "",
+    total_budget: editData?.total_budget || "",
+    manager_id: editData?.manager_id || "",
+    cost_center_id: editData?.cost_center_id || "",
     is_billable: editData?.is_billable ?? true,
   });
 
   const [errors, setErrors] = useState({});
 
+  const { data: centersData } = useCostCenters({
+    search: "",
+    status: "",
+    page: 0,
+    per_page: 100,
+  });
+
+  const costCenters = centersData?.cost_centers || [];
   const validateForm = () => {
     const newErrors = {};
-    
-    if (!formData.code) newErrors.code = 'Project code is required';
-    if (!formData.name) newErrors.name = 'Project name is required';
-    if (!formData.start_date) newErrors.start_date = 'Start date is required';
-    if (!formData.end_date) newErrors.end_date = 'End date is required';
-    if (formData.start_date && formData.end_date && 
-        new Date(formData.start_date) >= new Date(formData.end_date)) {
-      newErrors.end_date = 'End date must be after start date';
+
+    if (!formData.code) newErrors.code = "Project code is required";
+    if (!formData.name) newErrors.name = "Project name is required";
+    if (!formData.start_date) newErrors.start_date = "Start date is required";
+    if (!formData.end_date) newErrors.end_date = "End date is required";
+    if (
+      formData.start_date &&
+      formData.end_date &&
+      new Date(formData.start_date) >= new Date(formData.end_date)
+    ) {
+      newErrors.end_date = "End date must be after start date";
     }
     if (formData.total_budget && isNaN(parseFloat(formData.total_budget))) {
-      newErrors.total_budget = 'Invalid budget amount';
+      newErrors.total_budget = "Invalid budget amount";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -507,7 +551,7 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
           Project Information
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -516,8 +560,12 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
             <input
               type="text"
               value={formData.code}
-              onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-              className={`form-input mt-1 ${errors.code ? 'border-red-500' : ''}`}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, code: e.target.value }))
+              }
+              className={`form-input mt-1 ${
+                errors.code ? "border-red-500" : ""
+              }`}
               placeholder="e.g., PROJ001"
             />
             {errors.code && (
@@ -532,8 +580,12 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className={`form-input mt-1 ${errors.name ? 'border-red-500' : ''}`}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
+              }
+              className={`form-input mt-1 ${
+                errors.name ? "border-red-500" : ""
+              }`}
               placeholder="e.g., Education Initiative"
             />
             {errors.name && (
@@ -547,7 +599,9 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
             </label>
             <select
               value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, status: e.target.value }))
+              }
               className="form-select mt-1"
             >
               <option value="planning">Planning</option>
@@ -564,7 +618,9 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
             </label>
             <select
               value={formData.priority}
-              onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, priority: e.target.value }))
+              }
               className="form-select mt-1"
             >
               <option value="low">Low</option>
@@ -580,8 +636,12 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
             <input
               type="date"
               value={formData.start_date}
-              onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
-              className={`form-input mt-1 ${errors.start_date ? 'border-red-500' : ''}`}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, start_date: e.target.value }))
+              }
+              className={`form-input mt-1 ${
+                errors.start_date ? "border-red-500" : ""
+              }`}
             />
             {errors.start_date && (
               <p className="mt-1 text-sm text-red-600">{errors.start_date}</p>
@@ -595,8 +655,12 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
             <input
               type="date"
               value={formData.end_date}
-              onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
-              className={`form-input mt-1 ${errors.end_date ? 'border-red-500' : ''}`}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, end_date: e.target.value }))
+              }
+              className={`form-input mt-1 ${
+                errors.end_date ? "border-red-500" : ""
+              }`}
             />
             {errors.end_date && (
               <p className="mt-1 text-sm text-red-600">{errors.end_date}</p>
@@ -611,8 +675,15 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
               type="number"
               step="0.01"
               value={formData.total_budget}
-              onChange={(e) => setFormData(prev => ({ ...prev, total_budget: e.target.value }))}
-              className={`form-input mt-1 ${errors.total_budget ? 'border-red-500' : ''}`}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  total_budget: e.target.value,
+                }))
+              }
+              className={`form-input mt-1 ${
+                errors.total_budget ? "border-red-500" : ""
+              }`}
               placeholder="0.00"
             />
             {errors.total_budget && (
@@ -625,13 +696,41 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
               <input
                 type="checkbox"
                 checked={formData.is_billable}
-                onChange={(e) => setFormData(prev => ({ ...prev, is_billable: e.target.checked }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    is_billable: e.target.checked,
+                  }))
+                }
                 className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                 Billable Project
               </span>
             </label>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Cost Center
+            </label>
+            <select
+              value={formData.cost_center_id}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  cost_center_id: e.target.value,
+                }))
+              }
+              className="form-select mt-1"
+            >
+              <option value="">Select a cost center</option>
+              {costCenters.map((center) => (
+                <option key={center.id} value={center.id}>
+                  {center.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -641,7 +740,9 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
           </label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, description: e.target.value }))
+            }
             rows={4}
             className="form-textarea mt-1"
             placeholder="Describe the project objectives and scope..."
@@ -659,12 +760,12 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
         >
           Cancel
         </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn-primary"
-        >
-          {loading ? 'Saving...' : editData ? 'Update Project' : 'Create Project'}
+        <button type="submit" disabled={loading} className="btn-primary">
+          {loading
+            ? "Saving..."
+            : editData
+            ? "Update Project"
+            : "Create Project"}
         </button>
       </div>
     </form>
@@ -674,21 +775,22 @@ const ProjectForm = ({ onSubmit, onCancel, loading, editData }) => {
 // Project Details Component
 const ProjectDetails = ({ project, onClose, onEdit }) => {
   const { formatCurrency, formatDate } = useLanguage();
-  
+
   const getStatusColor = (status) => {
     const colors = {
-      planning: 'badge-warning',
-      active: 'badge-success',
-      on_hold: 'badge-warning',
-      completed: 'badge-info',
-      cancelled: 'badge-danger',
+      planning: "badge-warning",
+      active: "badge-success",
+      on_hold: "badge-warning",
+      completed: "badge-info",
+      cancelled: "badge-danger",
     };
-    return colors[status] || 'badge-info';
+    return colors[status] || "badge-info";
   };
 
-  const budgetUsed = project.total_budget > 0 
-    ? Math.round((project.used_budget / project.total_budget) * 100)
-    : 0;
+  const budgetUsed =
+    project.total_budget > 0
+      ? Math.round((project.used_budget / project.total_budget) * 100)
+      : 0;
 
   return (
     <div className="space-y-6">
@@ -696,14 +798,16 @@ const ProjectDetails = ({ project, onClose, onEdit }) => {
       <div className="border-b border-gray-200 pb-4">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-xl font-semibold text-gray-900">{project.name}</h3>
+            <h3 className="text-xl font-semibold text-gray-900">
+              {project.name}
+            </h3>
             <p className="text-gray-600 mt-1">{project.code}</p>
             <div className="flex items-center space-x-3 mt-3">
               <span className={`badge ${getStatusColor(project.status)}`}>
-                {project.status.replace('_', ' ')}
+                {project.status.replace("_", " ")}
               </span>
               <span className="text-sm text-gray-500">
-                Priority: {project.priority || 'medium'}
+                Priority: {project.priority || "medium"}
               </span>
             </div>
           </div>
@@ -719,48 +823,74 @@ const ProjectDetails = ({ project, onClose, onEdit }) => {
       {/* Project Information Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Project Details</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-3">
+            Project Details
+          </h4>
           <dl className="space-y-2">
             <div>
               <dt className="text-sm font-medium text-gray-500">Start Date</dt>
-              <dd className="text-sm text-gray-900">{formatDate(project.start_date)}</dd>
+              <dd className="text-sm text-gray-900">
+                {formatDate(project.start_date)}
+              </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">End Date</dt>
-              <dd className="text-sm text-gray-900">{formatDate(project.end_date)}</dd>
+              <dd className="text-sm text-gray-900">
+                {formatDate(project.end_date)}
+              </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Project Manager</dt>
-              <dd className="text-sm text-gray-900">{project.manager_name || 'Not assigned'}</dd>
+              <dt className="text-sm font-medium text-gray-500">
+                Project Manager
+              </dt>
+              <dd className="text-sm text-gray-900">
+                {project.manager_name || "Not assigned"}
+              </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Team Size</dt>
-              <dd className="text-sm text-gray-900">{project.team_size || 0} members</dd>
+              <dd className="text-sm text-gray-900">
+                {project.team_size || 0} members
+              </dd>
             </div>
           </dl>
         </div>
 
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Budget Information</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-3">
+            Budget Information
+          </h4>
           <dl className="space-y-2">
             <div>
-              <dt className="text-sm font-medium text-gray-500">Total Budget</dt>
-              <dd className="text-sm text-gray-900">{formatCurrency(project.total_budget || 0)}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Used Budget</dt>
-              <dd className="text-sm text-gray-900">{formatCurrency(project.used_budget || 0)}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Remaining Budget</dt>
+              <dt className="text-sm font-medium text-gray-500">
+                Total Budget
+              </dt>
               <dd className="text-sm text-gray-900">
-                {formatCurrency((project.total_budget || 0) - (project.used_budget || 0))}
+                {formatCurrency(project.total_budget || 0)}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Billing Status</dt>
+              <dt className="text-sm font-medium text-gray-500">Used Budget</dt>
               <dd className="text-sm text-gray-900">
-                {project.is_billable ? 'Billable' : 'Non-billable'}
+                {formatCurrency(project.used_budget || 0)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">
+                Remaining Budget
+              </dt>
+              <dd className="text-sm text-gray-900">
+                {formatCurrency(
+                  (project.total_budget || 0) - (project.used_budget || 0)
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">
+                Billing Status
+              </dt>
+              <dd className="text-sm text-gray-900">
+                {project.is_billable ? "Billable" : "Non-billable"}
               </dd>
             </div>
           </dl>
@@ -770,9 +900,13 @@ const ProjectDetails = ({ project, onClose, onEdit }) => {
       {/* Description */}
       {project.description && (
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-2">
+            Description
+          </h4>
           <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-sm text-gray-700 whitespace-pre-line">{project.description}</p>
+            <p className="text-sm text-gray-700 whitespace-pre-line">
+              {project.description}
+            </p>
           </div>
         </div>
       )}
@@ -780,14 +914,20 @@ const ProjectDetails = ({ project, onClose, onEdit }) => {
       {/* Progress Visualization */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Project Progress</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-3">
+            Project Progress
+          </h4>
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Progress</span>
-              <span className="text-sm font-medium text-gray-900">{project.progress || 0}%</span>
+              <span className="text-sm font-medium text-gray-700">
+                Progress
+              </span>
+              <span className="text-sm font-medium text-gray-900">
+                {project.progress || 0}%
+              </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
+              <div
                 className="bg-blue-500 h-3 rounded-full"
                 style={{ width: `${project.progress || 0}%` }}
               ></div>
@@ -796,17 +936,26 @@ const ProjectDetails = ({ project, onClose, onEdit }) => {
         </div>
 
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Budget Utilization</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-3">
+            Budget Utilization
+          </h4>
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Budget Used</span>
-              <span className="text-sm font-medium text-gray-900">{budgetUsed}%</span>
+              <span className="text-sm font-medium text-gray-700">
+                Budget Used
+              </span>
+              <span className="text-sm font-medium text-gray-900">
+                {budgetUsed}%
+              </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
+              <div
                 className={`h-3 rounded-full ${
-                  budgetUsed >= 90 ? 'bg-red-500' : 
-                  budgetUsed >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                  budgetUsed >= 90
+                    ? "bg-red-500"
+                    : budgetUsed >= 75
+                    ? "bg-yellow-500"
+                    : "bg-green-500"
                 }`}
                 style={{ width: `${Math.min(budgetUsed, 100)}%` }}
               ></div>
@@ -817,10 +966,14 @@ const ProjectDetails = ({ project, onClose, onEdit }) => {
 
       {/* Milestones Placeholder */}
       <div>
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Project Milestones</h4>
+        <h4 className="text-sm font-medium text-gray-900 mb-3">
+          Project Milestones
+        </h4>
         <div className="bg-gray-50 rounded-lg p-4 text-center text-gray-500">
           <p>No milestones defined</p>
-          <p className="text-xs mt-1">Project milestones and deliverables would be displayed here</p>
+          <p className="text-xs mt-1">
+            Project milestones and deliverables would be displayed here
+          </p>
         </div>
       </div>
 

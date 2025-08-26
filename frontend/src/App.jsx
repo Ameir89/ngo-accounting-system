@@ -29,6 +29,7 @@ const ChartOfAccounts = lazy(() => import("./pages/ChartOfAccounts"));
 const JournalEntries = lazy(() => import("./pages/JournalEntries"));
 const CostCenters = lazy(() => import("./pages/CostCenters"));
 const Suppliers = lazy(() => import("./pages/Suppliers"));
+const Projects = lazy(() => import("./pages/Projects"));
 const Grants = lazy(() => import("./pages/Grants"));
 const FixedAssets = lazy(() => import("./pages/FixedAssets"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -158,6 +159,7 @@ const App = () => {
                                 path="/cost-centers"
                                 element={<CostCenters />}
                               />
+                              <Route path="/projects" element={<Projects />} />
                               <Route
                                 path="/suppliers"
                                 element={<Suppliers />}
