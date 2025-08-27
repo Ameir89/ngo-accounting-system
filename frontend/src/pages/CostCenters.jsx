@@ -1,25 +1,45 @@
 // frontend/src/pages/CostCenters.jsx
-import { BarChart3, Edit, Eye, Plus, Search, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
-import toast from 'react-hot-toast';
-import ErrorMessage from '../components/UI/ErrorMessage';
-import LoadingSpinner from '../components/UI/LoadingSpinner';
-import Modal from '../components/UI/Modal';
-import { useLanguage } from '../contexts/LanguageContext';
-import { useCostCenters, useCreateCostCenter, useDeleteCostCenter, useUpdateCostCenter } from '../hooks/useApi';
+import {
+  BarChart3,
+  Edit,
+  Eye,
+  Plus,
+  Search,
+  Target,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
+import ErrorMessage from "../components/UI/ErrorMessage";
+import LoadingSpinner from "../components/UI/LoadingSpinner";
+import Modal from "../components/UI/Modal";
+import { useLanguage } from "../contexts/LanguageContext";
+import {
+  useCostCenters,
+  useCreateCostCenter,
+  useDeleteCostCenter,
+  useUpdateCostCenter,
+} from "../hooks/useApi/";
 
 const CostCenters = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [selectedCenter, setSelectedCenter] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [editingCenter, setEditingCenter] = useState(null);
-  
+
   const { t, formatCurrency, formatDate } = useLanguage();
-  
-  const { data: centersData, isLoading, error, refetch } = useCostCenters({
+
+  const {
+    data: centersData,
+    isLoading,
+    error,
+    refetch,
+  } = useCostCenters({
     search: searchTerm,
     status: statusFilter,
     page: currentPage,
@@ -34,40 +54,41 @@ const CostCenters = () => {
   const pagination = centersData?.pagination || {};
 
   const statusOptions = [
-    { value: '', label: 'All Statuses' },
-    { value: 'active', label: t('active') },
-    { value: 'inactive', label: t('inactive') },
+    { value: "", label: "All Statuses" },
+    { value: "active", label: t("active") },
+    { value: "inactive", label: t("inactive") },
   ];
 
   const handleSubmit = async (centerData) => {
     try {
       if (editingCenter) {
-        await updateCenterMutation.mutateAsync({ 
-          id: editingCenter.id, 
-          data: centerData 
+        await updateCenterMutation.mutateAsync({
+          id: editingCenter.id,
+          data: centerData,
         });
-        toast.success('Cost center updated successfully');
+        toast.success("Cost center updated successfully");
       } else {
         await createCenterMutation.mutateAsync(centerData);
-        toast.success('Cost center created successfully');
+        toast.success("Cost center created successfully");
       }
       setShowForm(false);
       setEditingCenter(null);
       refetch();
     } catch (error) {
-      toast.error(error.message || 'Operation failed');
+      toast.error(error.message || "Operation failed");
     }
   };
 
   const handleDelete = async (centerId) => {
-    if (!window.confirm('Are you sure you want to delete this cost center?')) return;
-    
+    if (!window.confirm("Are you sure you want to delete this cost center?"))
+      return;
+
     try {
       await deleteCenterMutation.mutateAsync(centerId);
-      toast.success('Cost center deleted successfully');
+      toast.success("Cost center deleted successfully");
       refetch();
     } catch (error) {
-      toast.error(error.message || 'Failed to delete cost center');
+      toast.error(error.message || "Failed to delete cost center");
     }
   };
 
@@ -149,7 +170,7 @@ const CostCenters = () => {
                 />
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Status
@@ -166,12 +187,12 @@ const CostCenters = () => {
                 ))}
               </select>
             </div>
-            
+
             <div className="flex items-end">
               <button
                 onClick={() => {
-                  setSearchTerm('');
-                  setStatusFilter('');
+                  setSearchTerm("");
+                  setStatusFilter("");
                 }}
                 className="btn-secondary"
               >
@@ -213,7 +234,7 @@ const CostCenters = () => {
           setShowForm(false);
           setEditingCenter(null);
         }}
-        title={editingCenter ? 'Edit Cost Center' : 'Add New Cost Center'}
+        title={editingCenter ? "Edit Cost Center" : "Add New Cost Center"}
         size="lg"
       >
         <CostCenterForm
@@ -222,7 +243,9 @@ const CostCenters = () => {
             setShowForm(false);
             setEditingCenter(null);
           }}
-          loading={createCenterMutation.isLoading || updateCenterMutation.isLoading}
+          loading={
+            createCenterMutation.isLoading || updateCenterMutation.isLoading
+          }
           editData={editingCenter}
         />
       </Modal>
@@ -231,7 +254,7 @@ const CostCenters = () => {
       <Modal
         isOpen={showDetails}
         onClose={() => setShowDetails(false)}
-        title={`Cost Center Details - ${selectedCenter?.name || ''}`}
+        title={`Cost Center Details - ${selectedCenter?.name || ""}`}
         size="xl"
       >
         {selectedCenter && (
@@ -307,7 +330,10 @@ const CostCentersTable = ({ costCenters, onView, onEdit, onDelete }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="table-cell text-center text-gray-500 dark:text-gray-400 py-8">
+                <td
+                  colSpan="7"
+                  className="table-cell text-center text-gray-500 dark:text-gray-400 py-8"
+                >
                   No cost centers found
                 </td>
               </tr>
@@ -322,10 +348,11 @@ const CostCentersTable = ({ costCenters, onView, onEdit, onDelete }) => {
 // Cost Center Row Component
 const CostCenterRow = ({ center, onView, onEdit, onDelete }) => {
   const { formatCurrency } = useLanguage();
-  
-  const utilization = center.annual_budget > 0 
-    ? Math.round((center.ytd_spending / center.annual_budget) * 100)
-    : 0;
+
+  const utilization =
+    center.annual_budget > 0
+      ? Math.round((center.ytd_spending / center.annual_budget) * 100)
+      : 0;
 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -347,7 +374,7 @@ const CostCenterRow = ({ center, onView, onEdit, onDelete }) => {
         </div>
       </td>
       <td className="table-cell text-gray-500 dark:text-gray-400">
-        {center.manager_name || 'Not assigned'}
+        {center.manager_name || "Not assigned"}
       </td>
       <td className="table-cell font-medium text-gray-900 dark:text-white">
         {formatCurrency(center.annual_budget || 0)}
@@ -359,13 +386,18 @@ const CostCenterRow = ({ center, onView, onEdit, onDelete }) => {
         <div className="flex items-center">
           <div className="flex-1">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-900 dark:text-white">{utilization}%</span>
+              <span className="text-gray-900 dark:text-white">
+                {utilization}%
+              </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-              <div 
+              <div
                 className={`h-2 rounded-full ${
-                  utilization >= 90 ? 'bg-red-500' : 
-                  utilization >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                  utilization >= 90
+                    ? "bg-red-500"
+                    : utilization >= 75
+                    ? "bg-yellow-500"
+                    : "bg-green-500"
                 }`}
                 style={{ width: `${Math.min(utilization, 100)}%` }}
               ></div>
@@ -374,27 +406,31 @@ const CostCenterRow = ({ center, onView, onEdit, onDelete }) => {
         </div>
       </td>
       <td className="table-cell">
-        <span className={`badge ${center.is_active ? 'badge-success' : 'badge-danger'}`}>
-          {center.is_active ? 'Active' : 'Inactive'}
+        <span
+          className={`badge ${
+            center.is_active ? "badge-success" : "badge-danger"
+          }`}
+        >
+          {center.is_active ? "Active" : "Inactive"}
         </span>
       </td>
       <td className="table-cell">
         <div className="flex items-center space-x-2">
-          <button 
+          <button
             onClick={() => onView(center)}
             className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400"
             title="View Details"
           >
             <Eye className="h-4 w-4" />
           </button>
-          <button 
+          <button
             onClick={() => onEdit(center)}
             className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400"
             title="Edit Cost Center"
           >
             <Edit className="h-4 w-4" />
           </button>
-          <button 
+          <button
             onClick={() => onDelete(center.id)}
             className="text-red-600 hover:text-red-900 dark:text-red-400"
             title="Delete Cost Center"
@@ -410,12 +446,12 @@ const CostCenterRow = ({ center, onView, onEdit, onDelete }) => {
 // Cost Center Form Component
 const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
   const [formData, setFormData] = useState({
-    code: editData?.code || '',
-    name: editData?.name || '',
-    description: editData?.description || '',
-    manager_id: editData?.manager_id || '',
-    parent_id: editData?.parent_id || '',
-    annual_budget: editData?.annual_budget || '',
+    code: editData?.code || "",
+    name: editData?.name || "",
+    description: editData?.description || "",
+    manager_id: editData?.manager_id || "",
+    parent_id: editData?.parent_id || "",
+    annual_budget: editData?.annual_budget || "",
     is_active: editData?.is_active ?? true,
   });
 
@@ -423,13 +459,13 @@ const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
 
   const validateForm = () => {
     const newErrors = {};
-    
-    if (!formData.code) newErrors.code = 'Code is required';
-    if (!formData.name) newErrors.name = 'Name is required';
+
+    if (!formData.code) newErrors.code = "Code is required";
+    if (!formData.name) newErrors.name = "Name is required";
     if (formData.annual_budget && isNaN(parseFloat(formData.annual_budget))) {
-      newErrors.annual_budget = 'Invalid budget amount';
+      newErrors.annual_budget = "Invalid budget amount";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -454,8 +490,10 @@ const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
           <input
             type="text"
             value={formData.code}
-            onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-            className={`form-input mt-1 ${errors.code ? 'border-red-500' : ''}`}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, code: e.target.value }))
+            }
+            className={`form-input mt-1 ${errors.code ? "border-red-500" : ""}`}
             placeholder="e.g., CC001"
           />
           {errors.code && (
@@ -470,8 +508,10 @@ const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
           <input
             type="text"
             value={formData.name}
-            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className={`form-input mt-1 ${errors.name ? 'border-red-500' : ''}`}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, name: e.target.value }))
+            }
+            className={`form-input mt-1 ${errors.name ? "border-red-500" : ""}`}
             placeholder="e.g., Administration"
           />
           {errors.name && (
@@ -487,8 +527,15 @@ const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
             type="number"
             step="0.01"
             value={formData.annual_budget}
-            onChange={(e) => setFormData(prev => ({ ...prev, annual_budget: e.target.value }))}
-            className={`form-input mt-1 ${errors.annual_budget ? 'border-red-500' : ''}`}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                annual_budget: e.target.value,
+              }))
+            }
+            className={`form-input mt-1 ${
+              errors.annual_budget ? "border-red-500" : ""
+            }`}
             placeholder="0.00"
           />
           {errors.annual_budget && (
@@ -502,7 +549,12 @@ const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
           </label>
           <select
             value={formData.is_active}
-            onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.value === 'true' }))}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                is_active: e.target.value === "true",
+              }))
+            }
             className="form-select mt-1"
           >
             <option value="true">Active</option>
@@ -516,7 +568,9 @@ const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
           </label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, description: e.target.value }))
+            }
             rows={3}
             className="form-textarea mt-1"
             placeholder="Optional description..."
@@ -533,12 +587,8 @@ const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
         >
           Cancel
         </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn-primary"
-        >
-          {loading ? 'Saving...' : 'Save Cost Center'}
+        <button type="submit" disabled={loading} className="btn-primary">
+          {loading ? "Saving..." : "Save Cost Center"}
         </button>
       </div>
     </form>
@@ -548,10 +598,11 @@ const CostCenterForm = ({ onSubmit, onCancel, loading, editData }) => {
 // Cost Center Details Component
 const CostCenterDetails = ({ costCenter, onClose, onEdit }) => {
   const { formatCurrency, formatDate } = useLanguage();
-  
-  const utilization = costCenter.annual_budget > 0 
-    ? Math.round((costCenter.ytd_spending / costCenter.annual_budget) * 100)
-    : 0;
+
+  const utilization =
+    costCenter.annual_budget > 0
+      ? Math.round((costCenter.ytd_spending / costCenter.annual_budget) * 100)
+      : 0;
 
   return (
     <div className="space-y-6">
@@ -563,10 +614,16 @@ const CostCenterDetails = ({ costCenter, onClose, onEdit }) => {
               <Target className="h-8 w-8 text-white" />
             </div>
             <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">{costCenter.name}</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {costCenter.name}
+              </h3>
               <p className="text-gray-600">{costCenter.code}</p>
-              <span className={`badge ${costCenter.is_active ? 'badge-success' : 'badge-danger'} mt-2`}>
-                {costCenter.is_active ? 'Active' : 'Inactive'}
+              <span
+                className={`badge ${
+                  costCenter.is_active ? "badge-success" : "badge-danger"
+                } mt-2`}
+              >
+                {costCenter.is_active ? "Active" : "Inactive"}
               </span>
             </div>
           </div>
@@ -582,7 +639,9 @@ const CostCenterDetails = ({ costCenter, onClose, onEdit }) => {
       {/* Details Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Basic Information</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-3">
+            Basic Information
+          </h4>
           <dl className="space-y-2">
             <div>
               <dt className="text-sm font-medium text-gray-500">Code</dt>
@@ -590,30 +649,49 @@ const CostCenterDetails = ({ costCenter, onClose, onEdit }) => {
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Manager</dt>
-              <dd className="text-sm text-gray-900">{costCenter.manager_name || 'Not assigned'}</dd>
+              <dd className="text-sm text-gray-900">
+                {costCenter.manager_name || "Not assigned"}
+              </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Created</dt>
-              <dd className="text-sm text-gray-900">{formatDate(costCenter.created_at)}</dd>
+              <dd className="text-sm text-gray-900">
+                {formatDate(costCenter.created_at)}
+              </dd>
             </div>
           </dl>
         </div>
 
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Budget Information</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-3">
+            Budget Information
+          </h4>
           <dl className="space-y-2">
             <div>
-              <dt className="text-sm font-medium text-gray-500">Annual Budget</dt>
-              <dd className="text-sm text-gray-900">{formatCurrency(costCenter.annual_budget || 0)}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">YTD Spending</dt>
-              <dd className="text-sm text-gray-900">{formatCurrency(costCenter.ytd_spending || 0)}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Remaining Budget</dt>
+              <dt className="text-sm font-medium text-gray-500">
+                Annual Budget
+              </dt>
               <dd className="text-sm text-gray-900">
-                {formatCurrency((costCenter.annual_budget || 0) - (costCenter.ytd_spending || 0))}
+                {formatCurrency(costCenter.annual_budget || 0)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">
+                YTD Spending
+              </dt>
+              <dd className="text-sm text-gray-900">
+                {formatCurrency(costCenter.ytd_spending || 0)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">
+                Remaining Budget
+              </dt>
+              <dd className="text-sm text-gray-900">
+                {formatCurrency(
+                  (costCenter.annual_budget || 0) -
+                    (costCenter.ytd_spending || 0)
+                )}
               </dd>
             </div>
           </dl>
@@ -623,26 +701,37 @@ const CostCenterDetails = ({ costCenter, onClose, onEdit }) => {
       {/* Description */}
       {costCenter.description && (
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-2">
+            Description
+          </h4>
           <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-sm text-gray-700 whitespace-pre-line">{costCenter.description}</p>
+            <p className="text-sm text-gray-700 whitespace-pre-line">
+              {costCenter.description}
+            </p>
           </div>
         </div>
       )}
 
       {/* Budget Progress */}
       <div>
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Budget Utilization</h4>
+        <h4 className="text-sm font-medium text-gray-900 mb-3">
+          Budget Utilization
+        </h4>
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Progress</span>
-            <span className="text-sm font-medium text-gray-900">{utilization}%</span>
+            <span className="text-sm font-medium text-gray-900">
+              {utilization}%
+            </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
-            <div 
+            <div
               className={`h-3 rounded-full ${
-                utilization >= 90 ? 'bg-red-500' : 
-                utilization >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                utilization >= 90
+                  ? "bg-red-500"
+                  : utilization >= 75
+                  ? "bg-yellow-500"
+                  : "bg-green-500"
               }`}
               style={{ width: `${Math.min(utilization, 100)}%` }}
             ></div>
@@ -689,17 +778,12 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems }) => (
     <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
       <div>
         <p className="text-sm text-gray-700 dark:text-gray-300">
-          Showing{' '}
-          <span className="font-medium">
-            {((currentPage - 1) * 20) + 1}
-          </span>{' '}
-          to{' '}
+          Showing{" "}
+          <span className="font-medium">{(currentPage - 1) * 20 + 1}</span> to{" "}
           <span className="font-medium">
             {Math.min(currentPage * 20, totalItems)}
-          </span>{' '}
-          of{' '}
-          <span className="font-medium">{totalItems}</span>{' '}
-          results
+          </span>{" "}
+          of <span className="font-medium">{totalItems}</span> results
         </p>
       </div>
       <div className="flex items-center space-x-2">
@@ -711,8 +795,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems }) => (
               onClick={() => onPageChange(page)}
               className={`px-3 py-2 text-sm rounded-md ${
                 currentPage === page
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  ? "bg-indigo-600 text-white"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               }`}
             >
               {page}

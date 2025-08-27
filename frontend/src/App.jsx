@@ -34,6 +34,7 @@ const Grants = lazy(() => import("./pages/Grants"));
 const FixedAssets = lazy(() => import("./pages/FixedAssets"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
+const BudgetManagement = lazy(() => import("./pages/BudgetManagement"));
 
 // Optimized Query Client with better defaults
 const queryClient = new QueryClient({
@@ -160,6 +161,10 @@ const App = () => {
                                 element={<CostCenters />}
                               />
                               <Route path="/projects" element={<Projects />} />
+                              <Route
+                                path="/budgets"
+                                element={<BudgetManagement />}
+                              />
                               <Route
                                 path="/suppliers"
                                 element={<Suppliers />}
