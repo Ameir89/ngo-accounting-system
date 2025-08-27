@@ -82,6 +82,79 @@ export {
   createMutationErrorHandler,
 } from "./core";
 
+// Import hooks for the legacy collection export
+import {
+  useAccounts,
+  useAccount,
+  useAccountsHierarchy,
+  useCreateAccount,
+  useUpdateAccount,
+  useDeleteAccount,
+} from "./accounts";
+
+import {
+  useJournalEntries,
+  useJournalEntry,
+  useCreateJournalEntry,
+  useUpdateJournalEntry,
+  usePostJournalEntry,
+  useDeleteJournalEntry,
+} from "./journalEntries";
+
+import {
+  useSuppliers,
+  useSupplier,
+  useCreateSupplier,
+  useUpdateSupplier,
+  useDeleteSupplier,
+  useGrants,
+  useGrant,
+  useGrantUtilization,
+  useCreateGrant,
+  useFixedAssets,
+  useFixedAsset,
+  useCreateFixedAsset,
+  useCostCenters,
+  useCostCenter,
+  useCreateCostCenter,
+  useUpdateCostCenter,
+  useDeleteCostCenter,
+} from "./other";
+
+import {
+  useDashboardData,
+  useDashboardOverview,
+  useDashboardFinancialSummary,
+  useDashboardCharts,
+  useComprehensiveDashboard,
+  useTrialBalance,
+  useBalanceSheet,
+  useIncomeStatement,
+  useCashFlow,
+  useApiHealth,
+  useAdvancedApi,
+} from "./reportsAndDashboard";
+
+import {
+  useProjects,
+  useProject,
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+  useProjectExpenses,
+} from "./projects";
+
+import {
+  useBudgets,
+  useBudget,
+  useCreateBudget,
+  useUpdateBudget,
+  useDeleteBudget,
+  useApproveBudget,
+  useBudgetLines,
+  useBudgetVarianceAnalysis,
+} from "./budgets";
+
 // Export all hooks as a collection for easier imports (backward compatibility)
 export const apiHooks = {
   // Accounts
