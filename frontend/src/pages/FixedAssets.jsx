@@ -15,6 +15,7 @@ import { useState } from "react";
 import Modal from "../components/UI/Modal";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useFixedAssets } from "../hooks/useApi/";
+import LoadingSpinner from "../components/UI/LoadingSpinner";
 
 const FixedAssets = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -104,11 +105,7 @@ const FixedAssets = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (error) {

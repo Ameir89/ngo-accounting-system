@@ -14,6 +14,7 @@ import { useState } from "react";
 import Modal from "../components/UI/Modal";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useGrants } from "../hooks/useApi/";
+import LoadingSpinner from "../components/UI/LoadingSpinner";
 
 const Grants = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,11 +75,7 @@ const Grants = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (error) {

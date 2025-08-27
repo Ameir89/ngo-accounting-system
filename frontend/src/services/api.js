@@ -662,11 +662,11 @@ export const apiService = {
   },
 
   fixedAssets: {
-    getAll: (params = {}) => api.get("/fixed-assets", { params }),
-    getById: (id) => api.get(`/fixed-assets/${id}`),
-    create: (data) => api.post("/fixed-assets", data),
-    update: (id, data) => api.put(`/fixed-assets/${id}`, data),
-    delete: (id) => api.delete(`/fixed-assets/${id}`),
+    getAll: (params = {}) => api.get("/assets", { params }),
+    getById: (id) => api.get(`/assets/${id}`),
+    create: (data) => api.post("/assets", data),
+    update: (id, data) => api.put(`/assets/${id}`, data),
+    delete: (id) => api.delete(`/assets/${id}`),
   },
 
   costCenters: {

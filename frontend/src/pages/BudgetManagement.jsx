@@ -767,7 +767,7 @@ const SummaryCard = ({ title, value, icon: Icon, color, trend }) => (
               {title}
             </dt>
             <dd className="flex items-baseline">
-              <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+              <div className="text-xl font-semibold text-gray-900 dark:text-white break-words">
                 {value}
               </div>
               {trend && (
@@ -807,6 +807,7 @@ const BudgetForm = ({ onSubmit, onCancel, loading, editData }) => {
     cost_center_id: editData?.cost_center_id || "",
     project_id: editData?.project_id || "",
     budget_type: editData?.budget_type || "operational",
+    budget_year: editData?.budget_year || new Date().getFullYear(),
   });
 
   const [errors, setErrors] = useState({});
@@ -819,6 +820,12 @@ const BudgetForm = ({ onSubmit, onCancel, loading, editData }) => {
     if (!formData.end_date) newErrors.end_date = "End date is required";
     if (!formData.total_amount)
       newErrors.total_amount = "Budget amount is required";
+    if (isNaN(formData.total_amount))
+      newErrors.total_amount = "Budget amount must be a number";
+
+    if (!formData.budget_year)
+      newErrors.budget_year = "Budget year is required";
+
     if (
       formData.start_date &&
       formData.end_date &&
@@ -973,6 +980,30 @@ const BudgetForm = ({ onSubmit, onCancel, loading, editData }) => {
               <p className="mt-1 text-sm text-red-600">{errors.end_date}</p>
             )}
           </div>
+        </div>
+
+        <div className="mt-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Budget Year *
+          </label>
+          <input
+            type="number"
+            // step="0.01"
+            value={formData.budget_year}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                budget_year: e.target.value,
+              }))
+            }
+            className={`form-input mt-1 ${
+              errors.budget_year ? "border-red-500" : ""
+            }`}
+            placeholder="2024"
+          />
+          {errors.budget_year && (
+            <p className="mt-1 text-sm text-red-600">{errors.budget_year}</p>
+          )}
         </div>
 
         <div className="mt-6">

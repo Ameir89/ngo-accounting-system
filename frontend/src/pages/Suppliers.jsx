@@ -14,6 +14,7 @@ import SupplierForm from "../components/Forms/SupplierForm";
 import Modal from "../components/UI/Modal";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useCreateSupplier, useSuppliers } from "../hooks/useApi/";
+import LoadingSpinner from "../components/UI/LoadingSpinner";
 
 const Suppliers = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -79,11 +80,7 @@ const Suppliers = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (error) {
