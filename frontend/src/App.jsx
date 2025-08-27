@@ -36,6 +36,8 @@ const FixedAssets = lazy(() => import("./pages/FixedAssets"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
 const BudgetManagement = lazy(() => import("./pages/BudgetManagement"));
+const AuditTrail = lazy(() => import("./pages/AuditTrail"));
+const UserManagement = lazy(() => import("./pages/UserManagement"));
 
 // Optimized Query Client with better defaults
 const queryClient = new QueryClient({
@@ -161,6 +163,14 @@ const App = () => {
                                 <Route
                                   path="/cost-centers"
                                   element={<CostCenters />}
+                                />
+                                <Route
+                                  path="/audit-trail"
+                                  element={<AuditTrail />}
+                                />
+                                <Route
+                                  path="/users"
+                                  element={<UserManagement />}
                                 />
                                 <Route
                                   path="/projects"
