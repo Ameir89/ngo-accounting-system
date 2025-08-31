@@ -438,7 +438,7 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
           },
           {
             name: t("Audit Trail"),
-            href: "/audit",
+            href: "/audit-trail",
             icon: Shield,
             permission: "audit_read",
             description: "Track system changes",

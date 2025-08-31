@@ -13,6 +13,7 @@ import {
 // Context Providers
 import { AuthProvider } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { SecurityProvider } from "./contexts/SecurityContext";
 
 // Layout Components
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -34,6 +35,9 @@ const Grants = lazy(() => import("./pages/Grants"));
 const FixedAssets = lazy(() => import("./pages/FixedAssets"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
+const BudgetManagement = lazy(() => import("./pages/BudgetManagement"));
+const AuditTrail = lazy(() => import("./pages/AuditTrail"));
+const UserManagement = lazy(() => import("./pages/UserManagement"));
 
 // Optimized Query Client with better defaults
 const queryClient = new QueryClient({
@@ -130,89 +134,109 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
           <AuthProvider>
-            <Router>
-              <div
-                className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200`}
-              >
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route
-                    path="/*"
-                    element={
-                      <ProtectedRoute>
-                        <Layout
-                          toggleDarkMode={toggleDarkMode}
-                          isDarkMode={isDarkMode}
-                        >
-                          <Suspense fallback={<PageFallback />}>
-                            <Routes>
-                              <Route path="/" element={<Dashboard />} />
-                              <Route
-                                path="/accounts"
-                                element={<ChartOfAccounts />}
-                              />
-                              <Route
-                                path="/journal-entries"
-                                element={<JournalEntries />}
-                              />
-                              <Route
-                                path="/cost-centers"
-                                element={<CostCenters />}
-                              />
-                              <Route path="/projects" element={<Projects />} />
-                              <Route
-                                path="/suppliers"
-                                element={<Suppliers />}
-                              />
-                              <Route path="/grants" element={<Grants />} />
-                              <Route
-                                path="/fixed-assets"
-                                element={<FixedAssets />}
-                              />
-                              <Route path="/reports" element={<Reports />} />
-                              <Route path="/settings" element={<Settings />} />
-                              <Route
-                                path="*"
-                                element={<Navigate to="/" replace />}
-                              />
-                            </Routes>
-                          </Suspense>
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                </Routes>
-              </div>
-            </Router>
+            <SecurityProvider>
+              <Router>
+                <div
+                  className={`min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200`}
+                >
+                  <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route
+                      path="/*"
+                      element={
+                        <ProtectedRoute>
+                          <Layout
+                            toggleDarkMode={toggleDarkMode}
+                            isDarkMode={isDarkMode}
+                          >
+                            <Suspense fallback={<PageFallback />}>
+                              <Routes>
+                                <Route path="/" element={<Dashboard />} />
+                                <Route
+                                  path="/accounts"
+                                  element={<ChartOfAccounts />}
+                                />
+                                <Route
+                                  path="/journal-entries"
+                                  element={<JournalEntries />}
+                                />
+                                <Route
+                                  path="/cost-centers"
+                                  element={<CostCenters />}
+                                />
+                                <Route
+                                  path="/audit-trail"
+                                  element={<AuditTrail />}
+                                />
+                                <Route
+                                  path="/users"
+                                  element={<UserManagement />}
+                                />
+                                <Route
+                                  path="/projects"
+                                  element={<Projects />}
+                                />
+                                <Route
+                                  path="/budgets"
+                                  element={<BudgetManagement />}
+                                />
+                                <Route
+                                  path="/suppliers"
+                                  element={<Suppliers />}
+                                />
+                                <Route path="/grants" element={<Grants />} />
+                                <Route
+                                  path="/fixed-assets"
+                                  element={<FixedAssets />}
+                                />
+                                <Route path="/reports" element={<Reports />} />
+                                <Route
+                                  path="/settings"
+                                  element={<Settings />}
+                                />
+                                <Route
+                                  path="*"
+                                  element={<Navigate to="/" replace />}
+                                />
+                              </Routes>
+                            </Suspense>
+                          </Layout>
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </div>
+              </Router>
 
-            {/* Enhanced Toast Notifications */}
-            <Toaster
-              position="top-right"
-              gutter={8}
-              containerClassName="z-50"
-              toastOptions={{
-                duration: 4000,
-                className:
-                  "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg",
-                success: {
-                  duration: 3000,
-                  iconTheme: {
-                    primary: "#10b981",
-                    secondary: "#ffffff",
+              {/* Enhanced Toast Notifications */}
+              <Toaster
+                position="top-right"
+                gutter={8}
+                containerClassName="z-50"
+                toastOptions={{
+                  duration: 4000,
+                  className:
+                    "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg",
+                  success: {
+                    duration: 3000,
+                    iconTheme: {
+                      primary: "#10b981",
+                      secondary: "#ffffff",
+                    },
                   },
-                },
-                error: {
-                  duration: 5000,
-                  iconTheme: {
-                    primary: "#ef4444",
-                    secondary: "#ffffff",
+                  error: {
+                    duration: 5000,
+                    iconTheme: {
+                      primary: "#ef4444",
+                      secondary: "#ffffff",
+                    },
                   },
-                },
-                loading: {
-                  duration: Infinity,
-                },
-              }}
-            />
+                  loading: {
+                    duration: Infinity,
+                  },
+                }}
+              />
+            </SecurityProvider>
           </AuthProvider>
         </LanguageProvider>
 

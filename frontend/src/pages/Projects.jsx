@@ -24,7 +24,7 @@ import {
   useProjects,
   useUpdateProject,
   useCostCenters,
-} from "../hooks/useApi";
+} from "../hooks/useApi/";
 
 const Projects = () => {
   const [searchTerm, setSearchTerm] = useState("");

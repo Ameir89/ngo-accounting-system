@@ -1,48 +1,58 @@
 // frontend/src/pages/Dashboard.jsx - Enhanced with proper error handling and data management
-import { AlertCircle, DollarSign, RefreshCw, TrendingDown, TrendingUp, Users } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
+import {
+  AlertCircle,
+  DollarSign,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
 // Components
-import BudgetChart from '../components/Charts/BudgetChart';
-import FinancialChart from '../components/Charts/FinancialChart';
-import RevenueChart from '../components/Charts/RevenueChart';
-import ErrorMessage from '../components/UI/ErrorMessage';
-import LoadingSpinner from '../components/UI/LoadingSpinner';
+import BudgetChart from "../components/Charts/BudgetChart";
+import FinancialChart from "../components/Charts/FinancialChart";
+import RevenueChart from "../components/Charts/RevenueChart";
+import ErrorMessage from "../components/UI/ErrorMessage";
+import LoadingSpinner from "../components/UI/LoadingSpinner";
 
 // Hooks and Services
-import { useLanguage } from '../contexts/LanguageContext';
-import { useComprehensiveDashboard, useDashboardOverview } from '../hooks/useApi';
-import { dashboardService } from '../services/dashboardService';
-import { errorHandler } from '../services/errorHandling';
+import { useLanguage } from "../contexts/LanguageContext";
+import {
+  useComprehensiveDashboard,
+  useDashboardOverview,
+} from "../hooks/useApi/";
+import { dashboardService } from "../services/dashboardService";
+import { errorHandler } from "../services/errorHandling";
 
 // Dashboard Card Component
-const DashboardCard = ({ 
-  title, 
-  value, 
-  icon: Icon, 
-  trend, 
+const DashboardCard = ({
+  title,
+  value,
+  icon: Icon,
+  trend,
   subtitle,
-  color = 'blue',
+  color = "blue",
   loading = false,
-  error = null 
+  error = null,
 }) => {
   const colorClasses = {
-    blue: 'bg-blue-500 text-white',
-    green: 'bg-green-500 text-white',
-    red: 'bg-red-500 text-white',
-    yellow: 'bg-yellow-500 text-white',
-    purple: 'bg-purple-500 text-white',
+    blue: "bg-blue-500 text-white",
+    green: "bg-green-500 text-white",
+    red: "bg-red-500 text-white",
+    yellow: "bg-yellow-500 text-white",
+    purple: "bg-purple-500 text-white",
   };
 
   const getTrendIcon = () => {
     if (!trend) return null;
-    return trend.direction === 'up' ? TrendingUp : TrendingDown;
+    return trend.direction === "up" ? TrendingUp : TrendingDown;
   };
 
   const getTrendColor = () => {
-    if (!trend) return '';
-    return trend.direction === 'up' ? 'text-green-600' : 'text-red-600';
+    if (!trend) return "";
+    return trend.direction === "up" ? "text-green-600" : "text-red-600";
   };
 
   const TrendIcon = getTrendIcon();
@@ -69,7 +79,9 @@ const DashboardCard = ({
         <div className="flex items-center">
           <AlertCircle className="h-8 w-8 text-red-500" />
           <div className="ml-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-white">{title}</h3>
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+              {title}
+            </h3>
             <p className="text-sm text-red-600">Failed to load</p>
           </div>
         </div>
@@ -114,19 +126,19 @@ const DashboardCard = ({
 // Alert Component
 const AlertCard = ({ alert, onDismiss }) => {
   const { t } = useLanguage();
-  
+
   const alertColors = {
-    info: 'border-blue-500 bg-blue-50 dark:bg-blue-900/20',
-    warning: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20',
-    danger: 'border-red-500 bg-red-50 dark:bg-red-900/20',
-    success: 'border-green-500 bg-green-50 dark:bg-green-900/20',
+    info: "border-blue-500 bg-blue-50 dark:bg-blue-900/20",
+    warning: "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20",
+    danger: "border-red-500 bg-red-50 dark:bg-red-900/20",
+    success: "border-green-500 bg-green-50 dark:bg-green-900/20",
   };
 
   const iconColors = {
-    info: 'text-blue-600',
-    warning: 'text-yellow-600',
-    danger: 'text-red-600',
-    success: 'text-green-600',
+    info: "text-blue-600",
+    warning: "text-yellow-600",
+    danger: "text-red-600",
+    success: "text-green-600",
   };
 
   return (
@@ -167,14 +179,14 @@ const Dashboard = () => {
     data: dashboardData,
     isLoading: isDashboardLoading,
     error: dashboardError,
-    refetch: refetchDashboard
+    refetch: refetchDashboard,
   } = useComprehensiveDashboard();
 
   const {
     data: overviewData,
     isLoading: isOverviewLoading,
     error: overviewError,
-    refetch: refetchOverview
+    refetch: refetchOverview,
   } = useDashboardOverview();
 
   // Load alerts and KPIs
@@ -191,7 +203,7 @@ const Dashboard = () => {
           setKpis(kpisData);
         }
       } catch (error) {
-        console.error('Failed to load dashboard extras:', error);
+        console.error("Failed to load dashboard extras:", error);
       }
     };
 
@@ -209,17 +221,14 @@ const Dashboard = () => {
     try {
       setRefreshing(true);
       dashboardService.clearCache();
-      
-      await Promise.all([
-        refetchDashboard(),
-        refetchOverview(),
-      ]);
-      
+
+      await Promise.all([refetchDashboard(), refetchOverview()]);
+
       setLastRefresh(new Date());
-      toast.success('Dashboard refreshed successfully');
+      toast.success("Dashboard refreshed successfully");
     } catch (error) {
-      errorHandler.handleApiError(error, { context: 'dashboard_refresh' });
-      toast.error('Failed to refresh dashboard');
+      errorHandler.handleApiError(error, { context: "dashboard_refresh" });
+      toast.error("Failed to refresh dashboard");
     } finally {
       setRefreshing(false);
     }
@@ -227,7 +236,7 @@ const Dashboard = () => {
 
   // Handle alert dismissal
   const handleDismissAlert = useCallback((alertId) => {
-    setAlerts(prev => prev.filter(alert => alert.id !== alertId));
+    setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
   }, []);
 
   // Memoized summary cards data
@@ -240,39 +249,46 @@ const Dashboard = () => {
 
       return [
         {
-          title: t('Total Revenue'),
-          value: formatCurrency(financialSummary?.current_month_performance?.revenue || 0),
+          title: t("Total Revenue"),
+          value: formatCurrency(
+            financialSummary?.current_month_performance?.revenue || 0
+          ),
           icon: DollarSign,
-          color: 'green',
+          color: "green",
           trend: kpis?.netIncome?.trend,
-          subtitle: 'This month'
+          subtitle: "This month",
         },
         {
-          title: t('Total Expenses'),
-          value: formatCurrency(financialSummary?.current_month_performance?.expenses || 0),
+          title: t("Total Expenses"),
+          value: formatCurrency(
+            financialSummary?.current_month_performance?.expenses || 0
+          ),
           icon: TrendingDown,
-          color: 'red',
+          color: "red",
           trend: kpis?.expenseRatio?.trend,
-          subtitle: 'This month'
+          subtitle: "This month",
         },
         {
-          title: t('Net Income'),
-          value: formatCurrency((financialSummary?.current_month_performance?.revenue || 0) - (financialSummary?.current_month_performance?.expenses || 0)),
+          title: t("Net Income"),
+          value: formatCurrency(
+            (financialSummary?.current_month_performance?.revenue || 0) -
+              (financialSummary?.current_month_performance?.expenses || 0)
+          ),
           icon: TrendingUp,
-          color: 'blue',
+          color: "blue",
           trend: kpis?.profitMargin?.trend,
-          subtitle: 'This month'
+          subtitle: "This month",
         },
         {
-          title: t('Active Projects'),
-          value: overview?.quick_stats?.total_projects || '0',
+          title: t("Active Projects"),
+          value: overview?.quick_stats?.total_projects || "0",
           icon: Users,
-          color: 'purple',
-          subtitle: 'Currently running'
+          color: "purple",
+          subtitle: "Currently running",
         },
       ];
     } catch (error) {
-      console.error('Error preparing summary cards:', error);
+      console.error("Error preparing summary cards:", error);
       return [];
     }
   }, [dashboardData, overviewData, kpis, t, formatCurrency]);
@@ -283,7 +299,7 @@ const Dashboard = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t('dashboard')}
+            {t("dashboard")}
           </h1>
           <LoadingSpinner size="sm" />
         </div>
@@ -313,20 +329,26 @@ const Dashboard = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t('dashboard')}
+            {t("dashboard")}
           </h1>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
             className="btn-secondary flex items-center"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            {t('refresh')}
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+            />
+            {t("refresh")}
           </button>
         </div>
 
         <ErrorMessage
-          message={dashboardError?.message || overviewError?.message || 'Failed to load dashboard data'}
+          message={
+            dashboardError?.message ||
+            overviewError?.message ||
+            "Failed to load dashboard data"
+          }
           onRetry={handleRefresh}
           showRetry={true}
         />
@@ -340,7 +362,7 @@ const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t('dashboard')}
+            {t("dashboard")}
           </h1>
           {lastRefresh && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -353,8 +375,10 @@ const Dashboard = () => {
           disabled={refreshing}
           className="btn-secondary flex items-center"
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing...' : t('refresh')}
+          <RefreshCw
+            className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+          />
+          {refreshing ? "Refreshing..." : t("refresh")}
         </button>
       </div>
 
@@ -365,7 +389,7 @@ const Dashboard = () => {
             Alerts & Notifications
           </h2>
           <div className="space-y-3">
-            {alerts.map(alert => (
+            {alerts.map((alert) => (
               <AlertCard
                 key={alert.id}
                 alert={alert}
@@ -433,13 +457,18 @@ const Dashboard = () => {
                     {kpi.formatted}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                    {key.replace(/([A-Z])/g, " $1").trim()}
                   </div>
                   {kpi.trend && (
-                    <div className={`text-xs mt-1 ${
-                      kpi.trend.direction === 'up' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {kpi.trend.direction === 'up' ? '↗' : '↘'} {kpi.trend.percentage}%
+                    <div
+                      className={`text-xs mt-1 ${
+                        kpi.trend.direction === "up"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {kpi.trend.direction === "up" ? "↗" : "↘"}{" "}
+                      {kpi.trend.percentage}%
                     </div>
                   )}
                 </div>
@@ -458,15 +487,9 @@ const Dashboard = () => {
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="btn-primary w-full">
-              Create Journal Entry
-            </button>
-            <button className="btn-secondary w-full">
-              Generate Report
-            </button>
-            <button className="btn-secondary w-full">
-              Export Dashboard
-            </button>
+            <button className="btn-primary w-full">Create Journal Entry</button>
+            <button className="btn-secondary w-full">Generate Report</button>
+            <button className="btn-secondary w-full">Export Dashboard</button>
           </div>
         </div>
       </div>

@@ -20,7 +20,7 @@ import {
   useCreateJournalEntry,
   useJournalEntries,
   usePostJournalEntry,
-} from "../hooks/useApi";
+} from "../hooks/useApi/";
 
 const JournalEntries = () => {
   const [searchTerm, setSearchTerm] = useState("");
