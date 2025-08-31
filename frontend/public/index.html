@@ -2,33 +2,45 @@
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-Security-Policy" content="
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
       default-src 'self' data: blob:;
       script-src 'self' 'unsafe-inline' blob:;
-      connect-src 'self' http://localhost:5000 ws://localhost:3000 http://188.34.167.110:5013;
+      connect-src *;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       font-src 'self' data: https://fonts.gstatic.com;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data:;
       worker-src 'self' blob:;
       font-src 'self' data:;
-    ">
+    "
+    />
 
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#4F46E5" />
-    <meta name="description" content="Complete financial management solution for non-profit organizations" />
+    <meta
+      name="description"
+      content="Complete financial management solution for non-profit organizations"
+    />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    
+
     <!-- Preload critical fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+
     <title>NGO Accounting System</title>
-    
+
     <!-- Loading screen styles -->
     <style>
       #loading-screen {
@@ -44,9 +56,9 @@
         align-items: center;
         z-index: 9999;
         color: white;
-        font-family: 'Inter', system-ui, sans-serif;
+        font-family: "Inter", system-ui, sans-serif;
       }
-      
+
       .loading-logo {
         width: 80px;
         height: 80px;
@@ -60,19 +72,19 @@
         margin-bottom: 2rem;
         animation: pulse 2s infinite;
       }
-      
+
       .loading-text {
         font-size: 1.5rem;
         font-weight: 600;
         margin-bottom: 1rem;
       }
-      
+
       .loading-subtitle {
         font-size: 1rem;
         opacity: 0.8;
         margin-bottom: 2rem;
       }
-      
+
       .loading-spinner {
         width: 40px;
         height: 40px;
@@ -81,16 +93,23 @@
         border-top-color: white;
         animation: spin 1s ease-in-out infinite;
       }
-      
+
       @keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+          transform: rotate(360deg);
+        }
       }
-      
+
       @keyframes pulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.05); }
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
       }
-      
+
       /* Hide scrollbars during loading */
       body.loading {
         overflow: hidden;
@@ -99,60 +118,74 @@
   </head>
   <body class="loading">
     <noscript>
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; text-align: center; font-family: system-ui, sans-serif;">
-        <h1 style="color: #dc2626; margin-bottom: 1rem;">JavaScript Required</h1>
-        <p style="color: #6b7280; margin-bottom: 1rem;">
+      <div
+        style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          padding: 2rem;
+          text-align: center;
+          font-family: system-ui, sans-serif;
+        "
+      >
+        <h1 style="color: #dc2626; margin-bottom: 1rem">JavaScript Required</h1>
+        <p style="color: #6b7280; margin-bottom: 1rem">
           NGO Accounting System requires JavaScript to function properly.
         </p>
-        <p style="color: #6b7280; font-size: 0.875rem;">
+        <p style="color: #6b7280; font-size: 0.875rem">
           Please enable JavaScript in your browser settings and reload the page.
         </p>
       </div>
     </noscript>
-    
+
     <!-- Loading Screen -->
     <div id="loading-screen">
       <div class="loading-logo">N</div>
       <div class="loading-text">NGO Accounting System</div>
-      <div class="loading-subtitle">Loading your financial management platform...</div>
+      <div class="loading-subtitle">
+        Loading your financial management platform...
+      </div>
       <div class="loading-spinner"></div>
     </div>
-    
+
     <!-- React Root Element -->
     <div id="root"></div>
-    
+
     <!-- Service Worker Registration -->
     <script>
       // Remove loading class when DOM is ready
-      document.addEventListener('DOMContentLoaded', function() {
-        document.body.classList.remove('loading');
+      document.addEventListener("DOMContentLoaded", function () {
+        document.body.classList.remove("loading");
       });
-      
+
       // Register service worker for offline functionality
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('%PUBLIC_URL%/sw.js')
-            .then(function(registration) {
-              console.log('SW registered: ', registration);
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker
+            .register("%PUBLIC_URL%/sw.js")
+            .then(function (registration) {
+              console.log("SW registered: ", registration);
             })
-            .catch(function(registrationError) {
-              console.log('SW registration failed: ', registrationError);
+            .catch(function (registrationError) {
+              console.log("SW registration failed: ", registrationError);
             });
         });
       }
-      
+
       // Global error handler for unhandled errors
-      window.addEventListener('error', function(event) {
-        console.error('Global error:', event.error);
-        
+      window.addEventListener("error", function (event) {
+        console.error("Global error:", event.error);
+
         // Hide loading screen if there's an error
-        const loadingScreen = document.getElementById('loading-screen');
+        const loadingScreen = document.getElementById("loading-screen");
         if (loadingScreen) {
-          loadingScreen.style.display = 'none';
+          loadingScreen.style.display = "none";
         }
-        
+
         // Show error message in root if React hasn't mounted
-        const root = document.getElementById('root');
+        const root = document.getElementById("root");
         if (root && !root.hasChildNodes()) {
           root.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; text-align: center; font-family: system-ui, sans-serif;">
