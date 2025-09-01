@@ -1,4 +1,4 @@
-// frontend/src/contexts/SecurityContext.jsx - Fixed version to prevent infinite loops and hook errors
+// frontend/src/contexts/SecurityContext.jsx - Fixed version to prevent hook rule violations
 
 import {
   createContext,
@@ -20,9 +20,6 @@ export const useSecurityContext = () => {
 };
 
 export const SecurityProvider = ({ children }) => {
-  // Remove the useAuth hook call that was causing the circular dependency
-  // Instead, we'll get auth state from localStorage or props when needed
-
   const [securitySettings] = useState({
     sessionTimeout: 30 * 60 * 1000, // 30 minutes
     passwordPolicy: {
@@ -66,6 +63,45 @@ export const SecurityProvider = ({ children }) => {
     }
   }, []);
 
+  // FIXED: Move handleActivity outside of useEffect and use useCallback properly
+  const handleActivity = useCallback(() => {
+    if (!isActiveRef.current) return;
+
+    const now = Date.now();
+    lastActivityRef.current = now;
+
+    // Clear existing timeouts
+    if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+
+    // Update state only if values actually changed
+    setSessionInfo((prev) => {
+      if (prev.lastActivity !== now || prev.warningShown || !prev.isActive) {
+        return {
+          lastActivity: now,
+          warningShown: false,
+          isActive: true,
+        };
+      }
+      return prev;
+    });
+
+    // Set warning timer (5 minutes before timeout)
+    warningTimeoutRef.current = setTimeout(() => {
+      setSessionInfo((prev) => ({ ...prev, warningShown: true }));
+    }, securitySettings.sessionTimeout - 5 * 60 * 1000);
+
+    // Set logout timer
+    sessionTimeoutRef.current = setTimeout(() => {
+      isActiveRef.current = false;
+      setSessionInfo((prev) => ({ ...prev, isActive: false }));
+      // Force logout
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      window.location.reload();
+    }, securitySettings.sessionTimeout);
+  }, [securitySettings.sessionTimeout]);
+
   // Session timeout monitoring with proper cleanup
   useEffect(() => {
     const { isAuthenticated } = getAuthState();
@@ -77,68 +113,23 @@ export const SecurityProvider = ({ children }) => {
       return;
     }
 
-    const handleSessionTimeout = () => {
-      isActiveRef.current = false;
-      setSessionInfo((prev) => ({ ...prev, isActive: false }));
-      // Force logout
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("user");
-      window.location.reload();
-    };
-
-    const resetTimer = () => {
-      // Clear existing timeouts
-      if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
-      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
-
-      const now = Date.now();
-      lastActivityRef.current = now;
-
-      // Only update state if values actually changed
-      setSessionInfo((prev) => {
-        if (prev.lastActivity !== now || prev.warningShown || !prev.isActive) {
-          return {
-            lastActivity: now,
-            warningShown: false,
-            isActive: true,
-          };
-        }
-        return prev;
-      });
-
-      // Set warning timer (5 minutes before timeout)
-      warningTimeoutRef.current = setTimeout(() => {
-        setSessionInfo((prev) => ({ ...prev, warningShown: true }));
-      }, securitySettings.sessionTimeout - 5 * 60 * 1000);
-
-      // Set timeout timer
-      sessionTimeoutRef.current = setTimeout(
-        handleSessionTimeout,
-        securitySettings.sessionTimeout
-      );
-    };
-
-    const handleActivity = useCallback(() => {
-      if (isActiveRef.current) {
-        resetTimer();
-      }
-    }, []);
-
-    // Activity listeners
+    // Activity events to reset timer
     const events = [
       "mousedown",
-      "mousemove",
+      "mousemove", 
       "keypress",
       "scroll",
       "touchstart",
       "click",
     ];
+
+    // Add event listeners
     events.forEach((event) => {
       document.addEventListener(event, handleActivity, true);
     });
 
     // Initialize timer
-    resetTimer();
+    handleActivity();
 
     return () => {
       // Cleanup
@@ -148,7 +139,7 @@ export const SecurityProvider = ({ children }) => {
         document.removeEventListener(event, handleActivity, true);
       });
     };
-  }, [securitySettings.sessionTimeout, getAuthState]);
+  }, [getAuthState, handleActivity]);
 
   // Password strength validation
   const validatePassword = useCallback(
