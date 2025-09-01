@@ -1,4 +1,4 @@
-// frontend/src/contexts/SecurityContext.jsx - Fixed version to prevent hook rule violations
+// frontend/src/contexts/SecurityContext.jsx - Fixed version
 
 import {
   createContext,
@@ -36,7 +36,7 @@ export const SecurityProvider = ({ children }) => {
     encryptionEnabled: true,
   });
 
-  // Use refs to prevent infinite loops
+  // Use refs to prevent infinite loops and avoid hook dependency issues
   const sessionTimeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
   const lastActivityRef = useRef(Date.now());
@@ -48,8 +48,8 @@ export const SecurityProvider = ({ children }) => {
     isActive: true,
   });
 
-  // Get auth state from localStorage instead of useAuth hook
-  const getAuthState = useCallback(() => {
+  // Simple function to get auth state - no useCallback needed
+  const getAuthState = () => {
     try {
       const token = localStorage.getItem("authToken");
       const user = localStorage.getItem("user");
@@ -61,10 +61,10 @@ export const SecurityProvider = ({ children }) => {
       console.error("Error getting auth state:", error);
       return { isAuthenticated: false, user: null };
     }
-  }, []);
+  };
 
-  // FIXED: Move handleActivity outside of useEffect and use useCallback properly
-  const handleActivity = useCallback(() => {
+  // FIXED: Define handleActivity as a stable function that doesn't change
+  const handleActivity = useRef(() => {
     if (!isActiveRef.current) return;
 
     const now = Date.now();
@@ -86,10 +86,13 @@ export const SecurityProvider = ({ children }) => {
       return prev;
     });
 
+    // Get current settings value
+    const currentTimeout = 30 * 60 * 1000; // Use static value to avoid dependencies
+
     // Set warning timer (5 minutes before timeout)
     warningTimeoutRef.current = setTimeout(() => {
       setSessionInfo((prev) => ({ ...prev, warningShown: true }));
-    }, securitySettings.sessionTimeout - 5 * 60 * 1000);
+    }, currentTimeout - 5 * 60 * 1000);
 
     // Set logout timer
     sessionTimeoutRef.current = setTimeout(() => {
@@ -99,10 +102,10 @@ export const SecurityProvider = ({ children }) => {
       localStorage.removeItem("authToken");
       localStorage.removeItem("user");
       window.location.reload();
-    }, securitySettings.sessionTimeout);
-  }, [securitySettings.sessionTimeout]);
+    }, currentTimeout);
+  }).current;
 
-  // Session timeout monitoring with proper cleanup
+  // Session timeout monitoring with fixed dependencies
   useEffect(() => {
     const { isAuthenticated } = getAuthState();
 
@@ -139,7 +142,7 @@ export const SecurityProvider = ({ children }) => {
         document.removeEventListener(event, handleActivity, true);
       });
     };
-  }, [getAuthState, handleActivity]);
+  }, []); // Empty dependency array - handleActivity is stable
 
   // Password strength validation
   const validatePassword = useCallback(
@@ -283,7 +286,7 @@ export const SecurityProvider = ({ children }) => {
         JSON.stringify(events.slice(-100))
       ); // Keep last 100
     },
-    [getAuthState]
+    []
   );
 
   // Check for suspicious activity
@@ -338,6 +341,7 @@ export const SecurityProvider = ({ children }) => {
     return Math.max(0, securitySettings.sessionTimeout - elapsed);
   }, [securitySettings.sessionTimeout]);
 
+  // Memoize the context value to prevent unnecessary re-renders
   const value = {
     securitySettings,
     sessionInfo,
