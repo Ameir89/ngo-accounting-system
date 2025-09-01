@@ -1,20 +1,21 @@
-// frontend/src/pages/AuditTrail.jsx
+// frontend/src/pages/AuditTrail.jsx - Fixed Version
 import {
   Calendar,
   Download,
   Eye,
   Filter,
-  Search,
   Shield,
-  User,
+  User
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import DataTable from "../components/Tables/DataTable";
 import ErrorMessage from "../components/UI/ErrorMessage";
+import LoadingSpinner from "../components/UI/LoadingSpinner";
 import Modal from "../components/UI/Modal";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../hooks/useAuth";
-import { dateUtils } from "../services/utils";
+import { exportUtils } from "../services/utils";
 
 // Mock data for audit trail (replace with actual API calls)
 const mockAuditData = [
@@ -121,6 +122,17 @@ const AuditTrail = () => {
     date_to: "",
   });
 
+  // Format date time helper
+  const formatDateTime = useCallback((dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    } catch (error) {
+      return 'Invalid date';
+    }
+  }, []);
+
   // Action types for filtering
   const actionTypes = [
     { value: "", label: "All Actions" },
@@ -206,23 +218,52 @@ const AuditTrail = () => {
   // Handle exporting audit data
   const handleExport = useCallback(
     (format) => {
-      const exportData = filteredData.map((entry) => ({
-        timestamp: formatDateTime(entry.timestamp),
-        user: entry.user_name,
-        action: entry.action,
-        resource: entry.resource_type,
-        description: entry.description,
-        ip_address: entry.ip_address,
-      }));
+      try {
+        const exportData = filteredData.map((entry) => ({
+          timestamp: formatDateTime(entry.timestamp),
+          user: entry.user_name,
+          action: entry.action,
+          resource: entry.resource_type,
+          description: entry.description,
+          ip_address: entry.ip_address,
+        }));
 
-      if (format === "csv") {
-        exportUtils.downloadCsv(exportData, "audit-trail");
-      } else {
-        exportUtils.downloadJson(filteredData, "audit-trail");
+        if (format === 'csv') {
+          exportUtils.downloadCsv(exportData, 'audit-trail');
+        } else {
+          exportUtils.downloadJson(filteredData, 'audit-trail');
+        }
+        
+        toast.success(t(`Audit trail exported as ${format.toUpperCase()}`));
+      } catch (error) {
+        console.error('Export error:', error);
+        toast.error(t('Failed to export audit trail'));
       }
     },
-    [filteredData, formatDateTime]
+    [filteredData, formatDateTime, t]
   );
+
+  // Load audit data (replace with real API call)
+  const loadAuditData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Mock API call - replace with actual API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // In real implementation, you would call:
+      // const response = await apiService.audit.getAll(filters);
+      // setAuditData(response.data);
+      
+      setAuditData(mockAuditData);
+    } catch (error) {
+      console.error('Load audit data error:', error);
+      setError('Failed to load audit data');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
   // Table columns configuration
   const columns = [
@@ -326,8 +367,24 @@ const AuditTrail = () => {
     [handleViewDetails]
   );
 
+  // Handle filter changes
+  const handleFilterChange = useCallback((key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setFilters({
+      user_id: "",
+      action: "",
+      resource_type: "",
+      date_from: "",
+      date_to: "",
+    });
+  }, []);
+
   if (error) {
-    return <ErrorMessage message={error} onRetry={() => setError(null)} />;
+    return <ErrorMessage message={error} onRetry={loadAuditData} />;
   }
 
   return (
@@ -382,6 +439,77 @@ const AuditTrail = () => {
         </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+              <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Total Events
+              </p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {filteredData.length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+              <User className="h-5 w-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Active Users
+              </p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {new Set(filteredData.map(entry => entry.user_id)).size}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+              <Filter className="h-5 w-5 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                High Risk Actions
+              </p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {filteredData.filter(entry => getRiskLevel(entry.action, entry.resource_type) === 'High').length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
+              <Calendar className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Today's Events
+              </p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {filteredData.filter(entry => {
+                  const entryDate = new Date(entry.timestamp);
+                  const today = new Date();
+                  return entryDate.toDateString() === today.toDateString();
+                }).length}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -391,9 +519,7 @@ const AuditTrail = () => {
             </label>
             <select
               value={filters.user_id}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, user_id: e.target.value }))
-              }
+              onChange={(e) => handleFilterChange('user_id', e.target.value)}
               className="form-select"
             >
               <option value="">All Users</option>
@@ -418,9 +544,7 @@ const AuditTrail = () => {
             </label>
             <select
               value={filters.action}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, action: e.target.value }))
-              }
+              onChange={(e) => handleFilterChange('action', e.target.value)}
               className="form-select"
             >
               {actionTypes.map((type) => (
@@ -437,12 +561,7 @@ const AuditTrail = () => {
             </label>
             <select
               value={filters.resource_type}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  resource_type: e.target.value,
-                }))
-              }
+              onChange={(e) => handleFilterChange('resource_type', e.target.value)}
               className="form-select"
             >
               {resourceTypes.map((type) => (
@@ -460,9 +579,7 @@ const AuditTrail = () => {
             <input
               type="date"
               value={filters.date_from}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, date_from: e.target.value }))
-              }
+              onChange={(e) => handleFilterChange('date_from', e.target.value)}
               className="form-input"
             />
           </div>
@@ -474,43 +591,50 @@ const AuditTrail = () => {
             <input
               type="date"
               value={filters.date_to}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, date_to: e.target.value }))
-              }
+              onChange={(e) => handleFilterChange('date_to', e.target.value)}
               className="form-input"
             />
           </div>
         </div>
 
-        <div className="mt-4 flex items-center space-x-3">
+        <div className="mt-4 flex items-center justify-between">
           <button
-            onClick={() =>
-              setFilters({
-                user_id: "",
-                action: "",
-                resource_type: "",
-                date_from: "",
-                date_to: "",
-              })
-            }
+            onClick={clearFilters}
             className="btn-secondary"
           >
             Clear Filters
+          </button>
+          
+          <button
+            onClick={loadAuditData}
+            disabled={loading}
+            className="btn-primary flex items-center"
+          >
+            {loading && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            )}
+            {loading ? 'Loading...' : 'Refresh'}
           </button>
         </div>
       </div>
 
       {/* Audit Trail Table */}
-      <DataTable
-        data={filteredData}
-        columns={columns}
-        actions={actions}
-        onRowAction={handleRowAction}
-        loading={loading}
-        emptyMessage="No audit entries found"
-        searchable={true}
-        exportable={false}
-      />
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <LoadingSpinner size="lg" message="Loading audit trail..." />
+        </div>
+      ) : (
+        <DataTable
+          data={filteredData}
+          columns={columns}
+          actions={actions}
+          onRowAction={handleRowAction}
+          loading={loading}
+          emptyMessage="No audit entries found"
+          searchable={true}
+          exportable={false}
+        />
+      )}
 
       {/* Details Modal */}
       <Modal

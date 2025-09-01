@@ -1,4 +1,4 @@
-// frontend/src/pages/UserManagement.jsx
+// frontend/src/pages/UserManagement.jsx - Fixed Version
 import {
   Edit,
   Lock,
@@ -10,11 +10,12 @@ import {
   UserX,
 } from "lucide-react";
 import { useCallback, useState } from "react";
+import toast from "react-hot-toast";
 import DataTable from "../components/Tables/DataTable";
 import ErrorMessage from "../components/UI/ErrorMessage";
-import LoadingSpinner from "../components/UI/LoadingSpinner";
 import Modal, { ConfirmModal } from "../components/UI/Modal";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../hooks/useAuth";
 
 // User Form Component
 const UserForm = ({ user = null, onSubmit, onCancel, loading }) => {
@@ -395,7 +396,8 @@ const mockUsersData = [
 ];
 
 const UserManagement = () => {
-  const { t, formatDateTime } = useLanguage();
+  const { t, formatDate } = useLanguage();
+  const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState(mockUsersData);
@@ -407,6 +409,17 @@ const UserManagement = () => {
     useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [userToResetPassword, setUserToResetPassword] = useState(null);
+
+  // Format date time helper
+  const formatDateTime = useCallback((dateString) => {
+    if (!dateString) return 'Never';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    } catch (error) {
+      return 'Invalid date';
+    }
+  }, []);
 
   // Get role badge color
   const getRoleBadgeColor = (role) => {
@@ -430,7 +443,7 @@ const UserManagement = () => {
   const handleCreateUser = async (userData) => {
     setLoading(true);
     try {
-      // Mock API call
+      // Mock API call - replace with actual API call
       const newUser = {
         ...userData,
         id: Date.now().toString(),
@@ -440,10 +453,9 @@ const UserManagement = () => {
 
       setUsers((prev) => [...prev, newUser]);
       setShowCreateModal(false);
-
-      // Show success message
       toast.success("User created successfully");
     } catch (error) {
+      console.error('Create user error:', error);
       toast.error("Failed to create user");
     } finally {
       setLoading(false);
@@ -454,7 +466,7 @@ const UserManagement = () => {
   const handleEditUser = async (userData) => {
     setLoading(true);
     try {
-      // Mock API call
+      // Mock API call - replace with actual API call
       setUsers((prev) =>
         prev.map((user) =>
           user.id === selectedUser.id ? { ...user, ...userData } : user
@@ -462,9 +474,9 @@ const UserManagement = () => {
       );
       setShowEditModal(false);
       setSelectedUser(null);
-
       toast.success("User updated successfully");
     } catch (error) {
+      console.error('Update user error:', error);
       toast.error("Failed to update user");
     } finally {
       setLoading(false);
@@ -477,13 +489,13 @@ const UserManagement = () => {
 
     setLoading(true);
     try {
-      // Mock API call
+      // Mock API call - replace with actual API call
       setUsers((prev) => prev.filter((user) => user.id !== userToDelete.id));
       setShowDeleteConfirm(false);
       setUserToDelete(null);
-
       toast.success("User deleted successfully");
     } catch (error) {
+      console.error('Delete user error:', error);
       toast.error("Failed to delete user");
     } finally {
       setLoading(false);
@@ -496,13 +508,14 @@ const UserManagement = () => {
 
     setLoading(true);
     try {
-      // Mock API call
+      // Mock API call - replace with actual API call
       toast.success(
         `Password reset email sent to ${userToResetPassword.email}`
       );
       setShowResetPasswordConfirm(false);
       setUserToResetPassword(null);
     } catch (error) {
+      console.error('Reset password error:', error);
       toast.error("Failed to reset password");
     } finally {
       setLoading(false);
@@ -513,7 +526,7 @@ const UserManagement = () => {
   const handleToggleUserStatus = async (user) => {
     setLoading(true);
     try {
-      // Mock API call
+      // Mock API call - replace with actual API call
       setUsers((prev) =>
         prev.map((u) =>
           u.id === user.id ? { ...u, is_active: !u.is_active } : u
@@ -524,6 +537,7 @@ const UserManagement = () => {
         `User ${!user.is_active ? "activated" : "deactivated"} successfully`
       );
     } catch (error) {
+      console.error('Toggle user status error:', error);
       toast.error("Failed to update user status");
     } finally {
       setLoading(false);
@@ -583,7 +597,7 @@ const UserManagement = () => {
       sortable: true,
       render: (value) => (
         <div className="text-sm text-gray-600 dark:text-gray-400">
-          {value ? formatDateTime(value) : "Never"}
+          {formatDateTime(value)}
         </div>
       ),
     },
@@ -641,7 +655,7 @@ const UserManagement = () => {
       title: "Delete User",
       icon: <Trash2 className="h-4 w-4" />,
       className: "text-red-600 hover:text-red-900",
-      condition: (user) => user.username !== "admin", // Cannot delete admin user
+      condition: (user) => user.username !== "admin" && user.id !== currentUser?.id,
     },
   ];
 
@@ -663,6 +677,8 @@ const UserManagement = () => {
         setUserToDelete(user);
         setShowDeleteConfirm(true);
         break;
+      default:
+        console.warn(`Unhandled action: ${action}`);
     }
   }, []);
 
