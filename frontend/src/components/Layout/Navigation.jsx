@@ -1,4 +1,4 @@
-// frontend/src/components/Layout/EnhancedNavigation.jsx - Optimized Version
+// frontend/src/components/Layout/EnhancedNavigation.jsx - Fixed Active States
 import {
   Activity,
   BarChart3,
@@ -27,30 +27,46 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import { useAuth } from "../../hooks/useAuth";
 
 // Memoized Navigation Item to prevent unnecessary re-renders
-const NavigationItem = memo(({ item, sectionColor, onItemClick, isActive }) => {
+const NavigationItem = memo(({ item, sectionColor, onItemClick }) => {
   const { isRTL } = useLanguage();
-  const colorClasses = getColorClasses(sectionColor, isActive);
+  const location = useLocation();
   const ItemIcon = item.icon;
+
+  const isActive = useMemo(() => {
+    if (item.href === "/") {
+      return location.pathname === "/";
+    }
+    return location.pathname.startsWith(item.href);
+  }, [item.href, location.pathname]);
+
+  const colorClasses = useMemo(
+    () => getColorClasses(sectionColor, isActive),
+    [sectionColor, isActive]
+  );
 
   return (
     <NavLink
       to={item.href}
       onClick={onItemClick}
-      className={({ isActive }) => `
+      className={`
         group flex items-center justify-between px-3 py-2.5 text-sm rounded-lg 
         transition-all duration-200 hover:scale-[1.02] hover:shadow-sm focus:outline-none
         focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800
         ${
           isActive
             ? `${colorClasses.bg} ${colorClasses.text} shadow-sm border ${colorClasses.border}`
-            : `hover:bg-gray-50 dark:hover:bg-gray-700/50 ${colorClasses.text}`
+            : `hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-400`
         }
       `}
       aria-label={`Navigate to ${item.name}`}
     >
       <div className="flex items-center space-x-3 min-w-0 flex-1">
         <ItemIcon
-          className={`h-4 w-4 flex-shrink-0 ${colorClasses.icon}`}
+          className={`h-4 w-4 flex-shrink-0 ${
+            isActive
+              ? colorClasses.icon
+              : "text-gray-500 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+          }`}
           aria-hidden="true"
         />
         <div className="min-w-0 flex-1">
@@ -87,18 +103,26 @@ NavigationItem.displayName = "NavigationItem";
 const NavigationSection = memo(
   ({ section, expandedSections, toggleSection, onItemClick }) => {
     const { hasPermission } = useAuth();
+    const location = useLocation();
 
-    // const visibleItems = useMemo(() =>
-    //   // section.items?.filter((item) => hasPermission(item.permission)) || [],
-    //   [section.items, hasPermission]
-    // );
-    const visibleItems = section?.items;
-    // if (visibleItems.length === 0) return null;
+    const visibleItems = useMemo(
+      () => section.items || [], // Disabled permission check - show all items
+      [section.items]
+    );
+
+    const isParentActive = useMemo(() => {
+      return visibleItems.some((item) => {
+        if (item.href === "/") {
+          return location.pathname === "/";
+        }
+        return location.pathname.startsWith(item.href);
+      });
+    }, [visibleItems, location.pathname]);
+
+    if (visibleItems.length === 0) return null;
 
     const isExpanded = expandedSections[section.id];
-    // const isActive = isParentActive(visibleItems);
-    const isActive = true;
-    const colorClasses = getColorClasses(section.color, isActive);
+    const colorClasses = getColorClasses(section.color, isParentActive);
     const SectionIcon = section.icon;
 
     return (
@@ -110,14 +134,23 @@ const NavigationSection = memo(
             w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg 
             transition-all duration-200 group hover:bg-gray-50 dark:hover:bg-gray-700/50
             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 
-            dark:focus:ring-offset-gray-800 ${colorClasses.bg} ${colorClasses.text}
+            dark:focus:ring-offset-gray-800 
+            ${
+              isParentActive
+                ? `${colorClasses.bg} ${colorClasses.text} shadow-sm border ${colorClasses.border}`
+                : "text-gray-700 dark:text-gray-300"
+            }
           `}
             aria-expanded={isExpanded}
             aria-controls={`section-${section.id}`}
           >
             <div className="flex items-center space-x-3">
               <SectionIcon
-                className={`h-5 w-5 ${colorClasses.icon}`}
+                className={`h-5 w-5 ${
+                  isParentActive
+                    ? colorClasses.icon
+                    : "text-gray-500 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+                }`}
                 aria-hidden="true"
               />
               <span className="font-semibold">{section.title}</span>
@@ -125,7 +158,11 @@ const NavigationSection = memo(
             <ChevronDown
               className={`h-4 w-4 transform transition-transform duration-200 ${
                 isExpanded ? "rotate-180" : ""
-              } ${colorClasses.icon}`}
+              } ${
+                isParentActive
+                  ? colorClasses.icon
+                  : "text-gray-500 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+              }`}
               aria-hidden="true"
             />
           </button>
@@ -288,16 +325,6 @@ const getColorClasses = (color, isActive = false) => {
     },
   };
   return colors[color] || colors.gray;
-};
-
-const isParentActive = (items) => {
-  const location = useLocation();
-  return items?.some((item) => {
-    if (item.href === "/") {
-      return location.pathname === "/";
-    }
-    return location.pathname.startsWith(item.href);
-  });
 };
 
 // Main Navigation Component
@@ -496,11 +523,9 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
       navigationSections.forEach((section) => {
         section.items.forEach((item) => {
           if (
-            hasPermission(item.permission) &&
-            (item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              item.description
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase()))
+            // hasPermission(item.permission) && // Disabled permission check
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.description.toLowerCase().includes(searchQuery.toLowerCase())
           ) {
             filtered.push({ ...item, section: section.title });
           }
@@ -510,7 +535,7 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
     } else {
       setFilteredItems([]);
     }
-  }, [searchQuery, navigationSections, hasPermission]);
+  }, [searchQuery, navigationSections]); // Removed hasPermission dependency
 
   const clearSearch = useCallback(() => {
     setSearchQuery("");
