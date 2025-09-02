@@ -37,8 +37,16 @@ def get_grants():
     query = Grant.query.join(Donor).join(Currency).outerjoin(Project)
     
     # Apply filters
+    # if status:
+    #     query = query.filter(Grant.status == GrantStatus(status.upper()))
+    # Apply filters
     if status:
-        query = query.filter(Grant.status == GrantStatus(status.upper()))
+        # Map lowercase input to Enum by name
+        try:
+            query = query.filter(Grant.status == GrantStatus[status.upper()])
+        except KeyError:
+            return jsonify({"error": f"Invalid status '{status}'"}), 400
+        
     if donor_id:
         query = query.filter(Grant.donor_id == donor_id)
     if search:
@@ -69,7 +77,8 @@ def get_grants():
         days_remaining = (grant.end_date - date.today()).days
         
         # Determine grant status
-        grant_status = grant.status.value
+        # grant_status = grant.status.value
+        grant_status = grant.status.value if grant.status else None
         if grant.end_date < date.today() and grant.status == GrantStatus.ACTIVE:
             grant_status = 'expired'
         

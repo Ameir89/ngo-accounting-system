@@ -1,4 +1,4 @@
-// frontend/src/contexts/SecurityContext.jsx - Fixed version to prevent infinite loops and hook errors
+// frontend/src/contexts/SecurityContext.jsx - Fixed version
 
 import {
   createContext,
@@ -20,9 +20,6 @@ export const useSecurityContext = () => {
 };
 
 export const SecurityProvider = ({ children }) => {
-  // Remove the useAuth hook call that was causing the circular dependency
-  // Instead, we'll get auth state from localStorage or props when needed
-
   const [securitySettings] = useState({
     sessionTimeout: 30 * 60 * 1000, // 30 minutes
     passwordPolicy: {
@@ -39,7 +36,7 @@ export const SecurityProvider = ({ children }) => {
     encryptionEnabled: true,
   });
 
-  // Use refs to prevent infinite loops
+  // Use refs to prevent infinite loops and avoid hook dependency issues
   const sessionTimeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
   const lastActivityRef = useRef(Date.now());
@@ -51,8 +48,8 @@ export const SecurityProvider = ({ children }) => {
     isActive: true,
   });
 
-  // Get auth state from localStorage instead of useAuth hook
-  const getAuthState = useCallback(() => {
+  // Simple function to get auth state - no useCallback needed
+  const getAuthState = () => {
     try {
       const token = localStorage.getItem("authToken");
       const user = localStorage.getItem("user");
@@ -64,9 +61,51 @@ export const SecurityProvider = ({ children }) => {
       console.error("Error getting auth state:", error);
       return { isAuthenticated: false, user: null };
     }
-  }, []);
+  };
 
-  // Session timeout monitoring with proper cleanup
+  // FIXED: Define handleActivity as a stable function that doesn't change
+  const handleActivity = useRef(() => {
+    if (!isActiveRef.current) return;
+
+    const now = Date.now();
+    lastActivityRef.current = now;
+
+    // Clear existing timeouts
+    if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+
+    // Update state only if values actually changed
+    setSessionInfo((prev) => {
+      if (prev.lastActivity !== now || prev.warningShown || !prev.isActive) {
+        return {
+          lastActivity: now,
+          warningShown: false,
+          isActive: true,
+        };
+      }
+      return prev;
+    });
+
+    // Get current settings value
+    const currentTimeout = 30 * 60 * 1000; // Use static value to avoid dependencies
+
+    // Set warning timer (5 minutes before timeout)
+    warningTimeoutRef.current = setTimeout(() => {
+      setSessionInfo((prev) => ({ ...prev, warningShown: true }));
+    }, currentTimeout - 5 * 60 * 1000);
+
+    // Set logout timer
+    sessionTimeoutRef.current = setTimeout(() => {
+      isActiveRef.current = false;
+      setSessionInfo((prev) => ({ ...prev, isActive: false }));
+      // Force logout
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      window.location.reload();
+    }, currentTimeout);
+  }).current;
+
+  // Session timeout monitoring with fixed dependencies
   useEffect(() => {
     const { isAuthenticated } = getAuthState();
 
@@ -77,68 +116,23 @@ export const SecurityProvider = ({ children }) => {
       return;
     }
 
-    const handleSessionTimeout = () => {
-      isActiveRef.current = false;
-      setSessionInfo((prev) => ({ ...prev, isActive: false }));
-      // Force logout
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("user");
-      window.location.reload();
-    };
-
-    const resetTimer = () => {
-      // Clear existing timeouts
-      if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
-      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
-
-      const now = Date.now();
-      lastActivityRef.current = now;
-
-      // Only update state if values actually changed
-      setSessionInfo((prev) => {
-        if (prev.lastActivity !== now || prev.warningShown || !prev.isActive) {
-          return {
-            lastActivity: now,
-            warningShown: false,
-            isActive: true,
-          };
-        }
-        return prev;
-      });
-
-      // Set warning timer (5 minutes before timeout)
-      warningTimeoutRef.current = setTimeout(() => {
-        setSessionInfo((prev) => ({ ...prev, warningShown: true }));
-      }, securitySettings.sessionTimeout - 5 * 60 * 1000);
-
-      // Set timeout timer
-      sessionTimeoutRef.current = setTimeout(
-        handleSessionTimeout,
-        securitySettings.sessionTimeout
-      );
-    };
-
-    const handleActivity = useCallback(() => {
-      if (isActiveRef.current) {
-        resetTimer();
-      }
-    }, []);
-
-    // Activity listeners
+    // Activity events to reset timer
     const events = [
       "mousedown",
-      "mousemove",
+      "mousemove", 
       "keypress",
       "scroll",
       "touchstart",
       "click",
     ];
+
+    // Add event listeners
     events.forEach((event) => {
       document.addEventListener(event, handleActivity, true);
     });
 
     // Initialize timer
-    resetTimer();
+    handleActivity();
 
     return () => {
       // Cleanup
@@ -148,7 +142,7 @@ export const SecurityProvider = ({ children }) => {
         document.removeEventListener(event, handleActivity, true);
       });
     };
-  }, [securitySettings.sessionTimeout, getAuthState]);
+  }, []); // Empty dependency array - handleActivity is stable
 
   // Password strength validation
   const validatePassword = useCallback(
@@ -292,7 +286,7 @@ export const SecurityProvider = ({ children }) => {
         JSON.stringify(events.slice(-100))
       ); // Keep last 100
     },
-    [getAuthState]
+    []
   );
 
   // Check for suspicious activity
@@ -347,6 +341,7 @@ export const SecurityProvider = ({ children }) => {
     return Math.max(0, securitySettings.sessionTimeout - elapsed);
   }, [securitySettings.sessionTimeout]);
 
+  // Memoize the context value to prevent unnecessary re-renders
   const value = {
     securitySettings,
     sessionInfo,
