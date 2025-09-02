@@ -18,7 +18,7 @@ import LoadingSpinner from "../components/UI/LoadingSpinner";
 
 const Grants = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedGrant, setSelectedGrant] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -40,6 +40,8 @@ const Grants = () => {
   const grants = grantsData?.grants || [];
   const pagination = grantsData?.pagination || {};
 
+  console.log("Grants Data:", grants);
+
   const statusOptions = [
     { value: "", label: "All Statuses" },
     { value: "active", label: "Active" },
@@ -59,8 +61,10 @@ const Grants = () => {
   };
 
   const calculateUtilization = (grant) => {
-    if (!grant.total_amount || grant.total_amount === 0) return 0;
-    return Math.round((grant.utilized_amount / grant.total_amount) * 100);
+    if (!grant?.financial?.amount || grant?.financial?.amount === 0) return 0;
+    return Math.round(
+      (grant?.financial?.utilized_amount / grant?.financial?.amount) * 100
+    );
   };
 
   const handleViewDetails = (grant) => {
@@ -296,26 +300,29 @@ const Grants = () => {
                       </td>
                       <td className="table-cell">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {grant.donor_name || "Unknown Donor"}
+                          {grant?.donor?.name || "Unknown Donor"}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {grant.donor_type || "N/A"}
+                          {grant?.donor?.name_ar || "N/A"}
                         </div>
                       </td>
                       <td className="table-cell">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {formatCurrency(grant.total_amount || 0)}
+                          {formatCurrency(grant?.financial?.amount || 0)}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          Used: {formatCurrency(grant.utilized_amount || 0)}
+                          Used:{" "}
+                          {formatCurrency(
+                            grant?.financial?.utilized_amount || 0
+                          )}
                         </div>
                       </td>
                       <td className="table-cell">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {formatDate(grant.start_date)}
+                          {formatDate(grant?.timeline?.start_date)}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          to {formatDate(grant.end_date)}
+                          to {formatDate(grant?.timeline?.end_date)}
                         </div>
                       </td>
                       <td className="table-cell">
