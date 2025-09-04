@@ -59,23 +59,39 @@ const CostCenters = () => {
     { value: "inactive", label: t("inactive") },
   ];
 
-  const handleSubmit = async (centerData) => {
-    try {
-      if (editingCenter) {
-        await updateCenterMutation.mutateAsync({
+  const handleSubmit = (centerData) => {
+    if (editingCenter) {
+      updateCenterMutation.mutate(
+        {
           id: editingCenter.id,
           data: centerData,
-        });
-        toast.success("Cost center updated successfully");
-      } else {
-        await createCenterMutation.mutateAsync(centerData);
-        toast.success("Cost center created successfully");
-      }
-      setShowForm(false);
-      setEditingCenter(null);
-      refetch();
-    } catch (error) {
-      toast.error(error.message || "Operation failed");
+        },
+        {
+          onSuccess: () => {
+            toast.success("Cost center updated successfully");
+            setShowForm(false);
+            setEditingCenter(null);
+            refetch();
+          },
+          onError: (error) => {
+            console.error("Update failed:", error);
+            toast.error(error?.message || "Update failed");
+          },
+        }
+      );
+    } else {
+      createCenterMutation.mutate(centerData, {
+        onSuccess: () => {
+          toast.success("Cost center created successfully");
+          setShowForm(false);
+          setEditingCenter(null);
+          refetch();
+        },
+        onError: (error) => {
+          console.error("Create failed:", error);
+          toast.error(error?.message || "Create failed");
+        },
+      });
     }
   };
 

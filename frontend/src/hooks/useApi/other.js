@@ -165,19 +165,33 @@ export const useCreateCostCenter = () => {
   });
 };
 
+/*************  ✨ Windsurf Command ⭐  *************/
+/**
+   * Hook for updating a cost center.
+   *
+   * Upon success, invalidates the cache for:
+   * - The list of cost centers
+   * - The specific cost center that was updated
+   * - The dashboard
+   *
+   * @returns A mutation hook with the following properties:
+   * - `mutate`: A function that accepts an object with `id` and `data` properties.
+   * - `isLoading`: A boolean indicating whether the mutation is in progress.
+   * - `isSuccess`: A boolean indicating whether the mutation was successful.
+   * - `isError`: A boolean indicating whether the mutation failed.
+
+/*******  fd10d162-12d3-4046-9f1d-5732c415c698  *******/
 export const useUpdateCostCenter = () => {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: ({ id, data }) => apiService.costCenters.update(id, data),
     onSuccess: (response, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["cost-centers"] });
       queryClient.invalidateQueries({ queryKey: ["cost-centers", id] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      return createMutationSuccessHandler(
-        [],
-        "Cost center updated successfully"
-      )(response);
+
+      // Use toast directly here (not in a handler function)
+      toast.success("Cost center updated successfully");
     },
     onError: createMutationErrorHandler("Failed to update cost center"),
   });

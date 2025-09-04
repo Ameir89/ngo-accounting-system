@@ -455,14 +455,7 @@ const EnhancedNavigation = ({ isMobile = false, onItemClick }) => {
             description: "Generate financial statements",
             badge: null,
           },
-          {
-            name: t("Analytics Dashboard"),
-            href: "/analytics",
-            icon: BarChart3,
-            permission: "reports_read",
-            description: "Advanced data insights",
-            badge: "New",
-          },
+
           {
             name: t("Audit Trail"),
             href: "/audit-trail",
